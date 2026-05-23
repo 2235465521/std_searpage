@@ -1,0 +1,369 @@
+@import "tailwindcss";
+
+@theme {
+  /* 注入商务色彩体系 (Tailwind v4 语法) */
+  --color-surface: #f8f9fa;
+  --color-on-surface: #191c1d;
+  --color-on-surface-variant: #414755;
+  --color-primary: #0058bc;
+  --color-primary-container: #0070eb;
+  --color-surface-container-low: #f3f4f5;
+  --color-surface-container-high: #e7e8e9;
+  --color-outline-variant: #c1c6d7;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  /* 注入字体家族 */
+  --font-headline: "Manrope", sans-serif;
+  --font-display: "Manrope", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-label: "Inter", sans-serif;
+}
+
+@layer components {
+  /* 极致毛玻璃卡片 */
+  .glass-card {
+    background-color: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0px 20px 40px rgba(0, 88, 188, 0.04);
+  }
+
+  /* 数据分析：结果 Tabs 与表格间距，避免表头与 Tab 栏叠层 */
+  .analytics-result-tabs .ant-tabs-nav {
+    margin-bottom: 12px !important;
+  }
+
+  .analytics-result-tabs .ant-tabs-content-holder {
+    overflow: visible;
+  }
+
+  .analytics-result-tabs .ant-table-wrapper {
+    margin-top: 4px;
+  }
+
+  .analytics-result-tabs .ant-tabs-tab {
+    font-weight: 600 !important;
+  }
+
+  .analytics-result-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: var(--color-primary) !important;
+  }
+
+  .drafting-unit-tabs .ant-tabs-nav {
+    margin-bottom: 8px !important;
+  }
+
+  .drafting-unit-tabs .ant-tabs-content-holder {
+    padding-top: 0;
+  }
+
+  /* 隐藏滚动条 */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* 检索栏：五个控件同高 44px，上边界对齐 */
+  .search-filter-bar {
+    --search-filter-control-h: 44px;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .search-filter-bar .ant-form-item {
+    margin-bottom: 0 !important;
+  }
+
+  .search-filter-bar .ant-form-item-label {
+    padding: 0 0 4px !important;
+    min-height: 20px !important;
+    line-height: 20px !important;
+  }
+
+  .search-filter-bar .ant-form-item-label > label {
+    height: 20px !important;
+  }
+
+  .search-filter-control,
+  .search-filter-btn {
+    height: var(--search-filter-control-h) !important;
+    min-height: var(--search-filter-control-h) !important;
+    max-height: var(--search-filter-control-h) !important;
+    box-sizing: border-box !important;
+    line-height: 1 !important;
+  }
+
+  .search-filter-btn {
+    margin: 0 !important;
+    padding-block: 0 !important;
+  }
+
+  .search-filter-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .search-filter-actions .search-filter-btn {
+    flex: 1;
+  }
+
+  @media (min-width: 768px) {
+    .search-filter-bar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto auto;
+      grid-template-rows: 20px var(--search-filter-control-h);
+      column-gap: 1rem;
+      row-gap: 4px;
+      align-items: start;
+    }
+
+    .search-filter-bar > .search-filter-item {
+      display: contents;
+    }
+
+    .search-filter-bar .ant-form-item-control,
+    .search-filter-bar .ant-form-item-control-input,
+    .search-filter-bar .ant-form-item-control-input-content {
+      height: var(--search-filter-control-h) !important;
+      min-height: var(--search-filter-control-h) !important;
+    }
+
+    .search-filter-item--1 .ant-form-item-label {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .search-filter-item--1 .ant-form-item-control {
+      grid-column: 1;
+      grid-row: 2;
+      align-self: start;
+    }
+
+    .search-filter-item--2 .ant-form-item-label {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .search-filter-item--2 .ant-form-item-control {
+      grid-column: 2;
+      grid-row: 2;
+      align-self: start;
+    }
+
+    .search-filter-item--3 .ant-form-item-label {
+      grid-column: 3;
+      grid-row: 1;
+    }
+
+    .search-filter-item--3 .ant-form-item-control {
+      grid-column: 3;
+      grid-row: 2;
+      align-self: start;
+    }
+
+    .search-filter-actions {
+      display: contents;
+    }
+
+    .search-filter-item--4 {
+      grid-column: 4;
+      grid-row: 2;
+      align-self: start;
+    }
+
+    .search-filter-item--5 {
+      grid-column: 5;
+      grid-row: 2;
+      align-self: start;
+    }
+
+    .search-filter-actions .search-filter-btn {
+      flex: none;
+    }
+  }
+
+  .search-filter-keyword.ant-input-affix-wrapper {
+    padding-inline-start: 12px !important;
+    padding-inline-end: 36px !important;
+  }
+
+  .search-filter-keyword.ant-input-affix-wrapper > input.ant-input {
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+
+  .search-filter-keyword .ant-input-prefix {
+    margin-inline-end: 10px !important;
+  }
+
+  .search-filter-keyword .ant-input-clear-icon {
+    inset-inline-end: 8px !important;
+    width: 22px !important;
+    height: 22px !important;
+    font-size: 16px !important;
+    line-height: 22px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .search-filter-keyword .ant-input-clear-icon .anticon {
+    font-size: 16px !important;
+  }
+
+  /* 使 AntD Select 与毛玻璃背景融合 */
+  .custom-select-transparent.ant-select {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 44px !important;
+  }
+
+  .custom-select-transparent .ant-select-selector {
+    width: 100% !important;
+    max-width: 100% !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0.5rem !important;
+    height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    padding-inline-end: 52px !important;
+  }
+
+  .custom-select-transparent .ant-select-clear {
+    inset-inline-end: 28px !important;
+    width: 22px !important;
+    height: 22px !important;
+    margin-top: 0 !important;
+    transform: translateY(-50%) !important;
+    top: 50% !important;
+    opacity: 0.6;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .custom-select-transparent .ant-select-clear .anticon {
+    font-size: 16px !important;
+  }
+
+  .custom-select-transparent .ant-select-clear:hover {
+    opacity: 1;
+  }
+
+  .custom-select-transparent .ant-select-arrow {
+    inset-inline-end: 10px !important;
+  }
+
+  .custom-select-transparent .ant-select-selection-wrap {
+    min-width: 0 !important;
+    flex: 1 !important;
+  }
+
+  .custom-select-transparent .ant-select-selection-item,
+  .custom-select-transparent .ant-select-selection-placeholder {
+    flex: 1 !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    line-height: 42px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  /* 数据分析 / 起草单位：与检索页同高的筛选控件 */
+  .panel-filter-control .ant-select,
+  .panel-filter-control .ant-input-affix-wrapper,
+  .panel-filter-control .ant-input {
+    width: 100% !important;
+    min-height: 44px !important;
+  }
+
+  .panel-filter-control .ant-select-selector {
+    min-height: 44px !important;
+    border-radius: 0.5rem !important;
+    border: none !important;
+    background-color: var(--color-surface-container-low) !important;
+    box-shadow: none !important;
+    align-items: center !important;
+  }
+
+  .panel-filter-control .ant-select-selection-item,
+  .panel-filter-control .ant-select-selection-placeholder {
+    line-height: 42px !important;
+  }
+
+  .panel-filter-control .ant-select-multiple .ant-select-selector {
+    min-height: 44px !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .panel-filter-control .ant-input,
+  .panel-filter-control .ant-input-affix-wrapper {
+    border-radius: 0.5rem !important;
+    border: none !important;
+    background-color: var(--color-surface-container-low) !important;
+    box-shadow: none !important;
+  }
+
+  .panel-filter-control .ant-input:focus,
+  .panel-filter-control .ant-select-focused .ant-select-selector {
+    box-shadow: 0 0 0 1px var(--color-primary) !important;
+    background-color: var(--color-surface-container-lowest) !important;
+  }
+}
+
+@layer base {
+  /* Material Symbols：随构建打包，避免刷新时 Google 字体 CDN 加载失败显示 search 等文字 */
+  .material-symbols-outlined {
+    font-family: "Material Symbols Outlined Variable", sans-serif;
+    font-weight: normal;
+    font-style: normal;
+    font-size: inherit;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: "liga";
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  }
+
+  body {
+    @apply bg-surface text-on-surface antialiased;
+    background-image: radial-gradient(circle at 15% 50%, rgba(0, 112, 235, 0.05), transparent 25%), 
+                      radial-gradient(circle at 85% 30%, rgba(0, 112, 235, 0.08), transparent 25%);
+    background-attachment: fixed;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* 进场动画 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out forwards;
+}

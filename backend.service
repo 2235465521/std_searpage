@@ -1,0 +1,15 @@
+[Unit]
+Description=Gunicorn daemon for Django Standard Search Backend
+After=network.target
+
+[Service]
+User=zkbz01
+Group=zkbz01
+WorkingDirectory=/home/zkbz01/std_searpage/backend
+ExecStart=/home/zkbz01/std_searpage/backend/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8001 config.wsgi:application
+Restart=always
+RestartSec=5
+EnvironmentFile=/home/zkbz01/std_searpage/backend/.env
+
+[Install]
+WantedBy=multi-user.target

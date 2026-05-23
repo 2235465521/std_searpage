@@ -1,0 +1,15 @@
+[Unit]
+Description=Celery Worker for Django Standard Search Backend
+After=network.target redis-server.service
+
+[Service]
+User=zkbz01
+Group=zkbz01
+WorkingDirectory=/home/zkbz01/std_searpage/backend
+ExecStart=/home/zkbz01/std_searpage/backend/venv/bin/celery -A config worker --loglevel=info
+Restart=always
+RestartSec=5
+EnvironmentFile=/home/zkbz01/std_searpage/backend/.env
+
+[Install]
+WantedBy=multi-user.target

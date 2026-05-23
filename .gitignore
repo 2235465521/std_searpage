@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+db.sqlite3
+
+# Node/Frontend
+node_modules/
+dist/
+.env.local
+.env.development.local
+.env.production.local
+.env.test.local
+
+# System/IDE
+.idea/
+.vscode/
+.DS_Store
+
+# Sensitive Configs
+backend/.env
