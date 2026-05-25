@@ -139,10 +139,13 @@ class StandardFileStatusView(APIView):
 class StandardDownloadView(APIView):
     permission_classes = [IsAuthenticated]
 
+    # 共享磁盘根目录（与 Nginx location /protected-files/ 的 alias 对应）
+    SHARED_DISK_ROOT = '/mnt/std_bk/磁盘阵列/标准文件下载'
+
     def get(self, request, std_id):
         std_id_str = urllib.parse.unquote(std_id)
         file_path = get_standard_file_path(std_id_str)
-        
+
         if not file_path or not os.path.exists(file_path):
             return Response(
                 {
@@ -155,6 +158,25 @@ class StandardDownloadView(APIView):
         content_type, _ = mimetypes.guess_type(file_path)
         content_type = content_type or 'application/octet-stream'
         filename = os.path.basename(file_path)
+
+        # 优先使用 Nginx X-Accel-Redirect（生产环境，速度快 10-20 倍）
+        # 将文件的绝对路径转换为 Nginx 内部路由路径
+        use_nginx = request.META.get('HTTP_X_FORWARDED_FOR') or \
+                    request.META.get('SERVER_SOFTWARE', '').startswith('gunicorn') or \
+                    not request.META.get('SERVER_SOFTWARE', '').startswith('WSGIServer')
+
+        if use_nginx and file_path.startswith(self.SHARED_DISK_ROOT):
+            # 把绝对路径转成 /protected-files/xxx 的相对路径
+            relative_path = file_path[len(self.SHARED_DISK_ROOT):]
+            accel_path = '/protected-files/' + relative_path.lstrip('/')
+            response = HttpResponse(content_type=content_type)
+            response['X-Accel-Redirect'] = urllib.parse.quote(accel_path)
+            response['Content-Disposition'] = (
+                f"attachment; filename*=UTF-8''{urllib.parse.quote(filename)}"
+            )
+            return response
+
+        # 降级：直接用 Python 流式传输（开发环境 / 文件不在共享盘时）
         response = FileResponse(open(file_path, 'rb'), content_type=content_type)
         response['Content-Disposition'] = (
             f"attachment; filename*=UTF-8''{urllib.parse.quote(filename)}"
