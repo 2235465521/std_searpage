@@ -9,6 +9,7 @@ import {
 } from "@ant-design/icons";
 import { login, selfRegister } from "../api/standards";
 import { persistAuthTokens } from "../api/tokenAuth";
+import { markSessionPendingAutoQuery } from "../utils/sessionAutoQuery";
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -42,6 +43,7 @@ const LoginPage = () => {
 
       // 1. 存储 Token 并启动到期前自动续期
       persistAuthTokens({ access: data.token, refresh: data.refresh });
+      markSessionPendingAutoQuery(); // 标记会话刚登录，各个页面需要触发首次自动查询
 
       // 2. 存储角色信息
       if (data.user?.role) {

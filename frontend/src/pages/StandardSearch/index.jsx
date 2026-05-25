@@ -259,11 +259,8 @@ const StandardSearch = () => {
         setSearchParams(new URLSearchParams(lastSearch));
         return;
       }
-      if (!shouldAutoQueryOnInitRef.current) {
-        setLoading(false);
-        return;
-      }
-      shouldAutoQueryOnInitRef.current = false;
+      
+      // 如果没有查询参数且没有历史记录，则默认自动查第一页
       setSearchParams(buildSearchParams(1, DEFAULT_PAGE_SIZE, {}));
       return;
     }

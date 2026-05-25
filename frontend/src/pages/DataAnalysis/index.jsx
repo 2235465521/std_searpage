@@ -316,7 +316,7 @@ const DataAnalysis = () => {
           setFilterYear(data.latest_year);
         }
 
-        if (shouldAutoQueryOnInitRef.current && !initialSummary) {
+        if (!initialSummary) {
           shouldAutoQueryOnInitRef.current = false;
           loadSummaryRef.current?.(
             {
