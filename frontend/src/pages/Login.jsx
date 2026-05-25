@@ -62,7 +62,12 @@ const LoginPage = () => {
       navigate(redirectTo && redirectTo !== "/login" ? redirectTo : "/search", { replace: true });
       message.success("登录成功，欢迎回来");
     } catch (error) {
-      message.error(error.message || "登录失败，请检查账号密码");
+      Modal.error({
+        title: "提示",
+        content: "账户密码输入错误",
+        okText: "确认",
+        centered: true,
+      });
     } finally {
       setLoading(false);
     }
