@@ -325,9 +325,9 @@
 }
 
 @layer base {
-  /* Material Symbols：随构建打包，避免刷新时 Google 字体 CDN 加载失败显示 search 等文字 */
+  /* Material Symbols：通过 Google Fonts CDN 加载，并使用 display=block 彻底消除 FOUT */
   .material-symbols-outlined {
-    font-family: "Material Symbols Outlined Variable", sans-serif;
+    font-family: "Material Symbols Outlined", sans-serif;
     font-weight: normal;
     font-style: normal;
     font-size: inherit;
@@ -341,10 +341,6 @@
     -webkit-font-feature-settings: "liga";
     -webkit-font-smoothing: antialiased;
     font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
-  }
-
-  body.fonts-loading .material-symbols-outlined {
-    color: transparent !important;
   }
 
   body {
