@@ -343,6 +343,10 @@
     font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
   }
 
+  body.fonts-loading .material-symbols-outlined {
+    color: transparent !important;
+  }
+
   body {
     @apply bg-surface text-on-surface antialiased;
     background-image: radial-gradient(circle at 15% 50%, rgba(0, 112, 235, 0.05), transparent 25%), 

@@ -10,6 +10,12 @@ if (localStorage.getItem('token') && localStorage.getItem('refresh_token')) {
   scheduleTokenRefresh()
 }
 
+// 防止 Material Symbols 字体加载期间出现英文乱码 (FOUT)
+document.body.classList.add('fonts-loading');
+document.fonts.ready.then(() => {
+  document.body.classList.remove('fonts-loading');
+});
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />
