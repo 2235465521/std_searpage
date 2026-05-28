@@ -97,20 +97,37 @@ def _glob_prefixes_for_path(prefix):
 
 
 def _glob_find_in_dir(search_dir, prefixes, allow_contains_match=False, extensions=FILE_EXTENSIONS):
-    """在指定目录下递归匹配指定扩展名的文件。"""
+    """在指定目录下匹配指定扩展名的文件（先进行高效的同级查找，未命中再进行递归查找）。"""
     if not os.path.isdir(search_dir):
         return None
 
+    # 1. 优先进行同级（非递归）高效匹配，避免局域网挂载盘全盘深度扫描
     for prefix in prefixes:
         for glob_prefix in _glob_prefixes_for_path(prefix):
             safe = re.sub(r'([\[\]*?])', r'[\1]', glob_prefix)
             for ext in extensions:
-                patterns = [os.path.join(search_dir, '**', f'{safe}*{ext}')]
-                # 待处理等目录：01.020_GBT 13725-2019_F_... 需中间匹配
+                flat_patterns = [os.path.join(search_dir, f'{safe}*{ext}')]
                 if allow_contains_match:
-                    patterns.append(os.path.join(search_dir, '**', f'*{safe}*{ext}'))
+                    flat_patterns.append(os.path.join(search_dir, f'*{safe}*{ext}'))
 
-                for pattern in patterns:
+                for pattern in flat_patterns:
+                    try:
+                        matches = glob.glob(pattern, recursive=False)
+                    except OSError:
+                        continue
+                    if matches:
+                        return matches[0]
+
+    # 2. 同级未命中，再进行深度递归查找
+    for prefix in prefixes:
+        for glob_prefix in _glob_prefixes_for_path(prefix):
+            safe = re.sub(r'([\[\]*?])', r'[\1]', glob_prefix)
+            for ext in extensions:
+                recursive_patterns = [os.path.join(search_dir, '**', f'{safe}*{ext}')]
+                if allow_contains_match:
+                    recursive_patterns.append(os.path.join(search_dir, '**', f'*{safe}*{ext}'))
+
+                for pattern in recursive_patterns:
                     try:
                         matches = glob.glob(pattern, recursive=True)
                     except OSError:
