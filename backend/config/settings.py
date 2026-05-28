@@ -172,13 +172,13 @@ else:
     SHARED_DISK_DIR = os.getenv('SHARED_DISK_DIR', r'/mnt/std_bk/磁盘阵列/标准文件下载/')
 # 标准类别 -> 子文件夹映射（可按实际目录名在下方增改）
 SHARED_DISK_TYPE_FOLDERS = {
-    'GB': ['word的国标', '待处理'],
-    'DB': ['word的地标'],
-    'HB': ['word的行标'],
-    'TB': ['word的行标', '食品安全标准word版'],
-    'ISO': ['待处理', 'word的国标'],
-    'IEC': ['待处理', 'word的国标'],
-    'IEEE': ['待处理', 'word的国标'],
+    'GB': ['国标下载', 'word的国标', '待处理'],
+    'DB': ['地标下载', 'word的地标'],
+    'HB': ['行标下载', 'word的行标'],
+    'TB': ['团体标准', '团标下载', 'word的行标', '食品安全标准word版'],
+    'ISO': ['待处理', '国标下载', 'word的国标'],
+    'IEC': ['待处理', '国标下载', 'word的国标'],
+    'IEEE': ['待处理', '国标下载', 'word的国标'],
 }
 # 是否在分类目录未命中时递归整个根目录（慢，仅调试时开启）
 SHARED_DISK_DEEP_SEARCH = False
