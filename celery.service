@@ -5,11 +5,12 @@ After=network.target redis-server.service
 [Service]
 User=zkbz01
 Group=zkbz01
-WorkingDirectory=/home/zkbz01/std_searpage/backend
-ExecStart=/home/zkbz01/std_searpage/backend/venv/bin/celery -A config worker --loglevel=info
+WorkingDirectory=/home/zkbz01/std_searpage_v2/backend
+# 注意：如果使用 Conda 虚拟环境，请将下方 ExecStart 路径替换为您的 Conda 环境路径，例如：/home/zkbz01/miniconda3/envs/std_searpage/bin/celery
+ExecStart=/home/zkbz01/std_searpage_v2/backend/venv/bin/celery -A config worker --loglevel=info
 Restart=always
 RestartSec=5
-EnvironmentFile=/home/zkbz01/std_searpage/backend/.env
+EnvironmentFile=/home/zkbz01/std_searpage_v2/backend/.env
 
 [Install]
 WantedBy=multi-user.target
