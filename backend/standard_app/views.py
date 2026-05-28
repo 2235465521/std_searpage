@@ -139,13 +139,10 @@ class StandardFileStatusView(APIView):
 class StandardDownloadView(APIView):
     permission_classes = [IsAuthenticated]
 
-    # 共享磁盘根目录（与 Nginx location /protected-files/ 的 alias 对应）
-    SHARED_DISK_ROOT = '/mnt/std_bk/磁盘阵列/标准文件下载'
-
     def get(self, request, std_id):
         std_id_str = urllib.parse.unquote(std_id)
         file_path = get_standard_file_path(std_id_str)
-
+        
         if not file_path or not os.path.exists(file_path):
             return Response(
                 {
@@ -158,25 +155,6 @@ class StandardDownloadView(APIView):
         content_type, _ = mimetypes.guess_type(file_path)
         content_type = content_type or 'application/octet-stream'
         filename = os.path.basename(file_path)
-
-        # 优先使用 Nginx X-Accel-Redirect（生产环境，速度快 10-20 倍）
-        # 将文件的绝对路径转换为 Nginx 内部路由路径
-        use_nginx = request.META.get('HTTP_X_FORWARDED_FOR') or \
-                    request.META.get('SERVER_SOFTWARE', '').startswith('gunicorn') or \
-                    not request.META.get('SERVER_SOFTWARE', '').startswith('WSGIServer')
-
-        if use_nginx and file_path.startswith(self.SHARED_DISK_ROOT):
-            # 把绝对路径转成 /protected-files/xxx 的相对路径
-            relative_path = file_path[len(self.SHARED_DISK_ROOT):]
-            accel_path = '/protected-files/' + relative_path.lstrip('/')
-            response = HttpResponse(content_type=content_type)
-            response['X-Accel-Redirect'] = urllib.parse.quote(accel_path)
-            response['Content-Disposition'] = (
-                f"attachment; filename*=UTF-8''{urllib.parse.quote(filename)}"
-            )
-            return response
-
-        # 降级：直接用 Python 流式传输（开发环境 / 文件不在共享盘时）
         response = FileResponse(open(file_path, 'rb'), content_type=content_type)
         response['Content-Disposition'] = (
             f"attachment; filename*=UTF-8''{urllib.parse.quote(filename)}"
@@ -431,26 +409,58 @@ class UnitFirstParticipationView(APIView):
                     std_scope=_parse_unit_std_scope(request),
                 )
             else:
-                items = unit_search_service.find_first_participation_by_region(
+                data = unit_search_service.query_first_participation_page(
                     std_scope=_parse_unit_std_scope(request),
+                    first_year_from=request.query_params.get('first_year_from'),
+                    first_year_to=request.query_params.get('first_year_to'),
+                    rank_query=request.query_params.get('rank_query'),
+                    list_mode=request.query_params.get('list_mode')
+                    or request.query_params.get('export_mode')
+                    or 'detail',
+                    page=request.query_params.get('page', 1),
+                    size=request.query_params.get('size', 50),
                     **_unit_region_params(request),
                 )
-                try:
-                    page = max(1, int(request.query_params.get('page', 1)))
-                    size = min(200, max(1, int(request.query_params.get('size', 50))))
-                except (TypeError, ValueError):
-                    page, size = 1, 50
-                total = len(items)
-                start = (page - 1) * size
-                data = {
-                    'total': total,
-                    'items': items[start:start + size],
-                    'page': page,
-                    'size': size,
-                }
         except ValueError as exc:
             return Response({'code': 400, 'message': str(exc), 'data': None}, status=400)
         return Response({'code': 0, 'message': 'success', 'data': data})
+
+
+class UnitFirstParticipationExportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            export_items, analysis, meta = unit_search_service.build_first_participation_export_data(
+                std_scope=_parse_unit_std_scope(request),
+                first_year_from=request.query_params.get('first_year_from'),
+                first_year_to=request.query_params.get('first_year_to'),
+                rank_query=request.query_params.get('rank_query'),
+                export_mode=request.query_params.get('export_mode', 'detail'),
+                export_scope=request.query_params.get('export_scope', 'all'),
+                page=request.query_params.get('page', 1),
+                page_from=request.query_params.get('page_from'),
+                page_to=request.query_params.get('page_to'),
+                size=request.query_params.get('size', 50),
+                **_unit_region_params(request),
+            )
+        except ValueError as exc:
+            return Response({'code': 400, 'message': str(exc), 'data': None}, status=400)
+
+        buf = unit_search_service.build_first_participation_excel(
+            export_items,
+            analysis,
+            export_mode=meta.get('export_mode'),
+        )
+        region_tag = meta.get('region_label') or '地区'
+        year_tag = meta.get('first_year_label') or '不限年份'
+        filename = urllib.parse.quote(f"单位首次参与_{region_tag}_{year_tag}.xlsx")
+        response = HttpResponse(
+            buf.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = f"attachment; filename*=UTF-8''{filename}"
+        return response
 
 
 class AnalyticsRegionsView(APIView):

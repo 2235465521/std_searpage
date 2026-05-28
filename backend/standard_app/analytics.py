@@ -10,7 +10,7 @@ from django.db import connection
 from django.db.models import Count, Max, Q
 from django.db.models.functions import ExtractYear
 
-from .redis_circuit import safe_cache_get, safe_cache_set
+from django.core.cache import cache as redis_cache
 from .models import AreaDict, StdUnitRelation, UnitDict, ViewStdFull
 from .std_type_util import normalize_std_type_code
 
@@ -358,7 +358,7 @@ def _cache_key(prefix, province, city, county, year=None, std_scope=None):
 
 
 def _cache_get(key):
-    result = safe_cache_get(key)
+    result = redis_cache.get(key)
     if result is not None:
         return result
     entry = _SUMMARY_CACHE.get(key)
@@ -369,7 +369,10 @@ def _cache_get(key):
 
 def _cache_set(key, data):
     _SUMMARY_CACHE[key] = {'data': data, 'expires': time.time() + _SUMMARY_CACHE_TTL}
-    safe_cache_set(key, data, _SUMMARY_CACHE_TTL)
+    try:
+        redis_cache.set(key, data, _SUMMARY_CACHE_TTL)
+    except Exception:
+        pass
 
 
 def clear_summary_cache():

@@ -18,7 +18,7 @@ export default function ChartCard({ title, subtitle, children, footer, className
   return (
     <div
       className={[
-        'rounded-xl border border-slate-100 bg-gradient-to-b from-white to-slate-50/40 p-4 shadow-sm',
+        'min-w-0 rounded-xl border border-slate-100 bg-gradient-to-b from-white to-slate-50/40 p-4 shadow-sm',
         className,
       ].join(' ')}
     >

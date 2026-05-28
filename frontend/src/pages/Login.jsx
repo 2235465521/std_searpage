@@ -9,7 +9,7 @@ import {
 } from "@ant-design/icons";
 import { login, selfRegister } from "../api/standards";
 import { persistAuthTokens } from "../api/tokenAuth";
-import { markSessionPendingAutoQuery } from "../utils/sessionAutoQuery";
+import { SIDEBAR_AUTO_COLLAPSE_SESSION_KEY } from "../contexts/SidebarContext";
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -43,7 +43,6 @@ const LoginPage = () => {
 
       // 1. 存储 Token 并启动到期前自动续期
       persistAuthTokens({ access: data.token, refresh: data.refresh });
-      markSessionPendingAutoQuery(); // 标记会话刚登录，各个页面需要触发首次自动查询
 
       // 2. 存储角色信息
       if (data.user?.role) {
@@ -61,15 +60,11 @@ const LoginPage = () => {
       }
 
       const redirectTo = location.state?.from;
+      sessionStorage.setItem(SIDEBAR_AUTO_COLLAPSE_SESSION_KEY, '1');
       navigate(redirectTo && redirectTo !== "/login" ? redirectTo : "/search", { replace: true });
       message.success("登录成功，欢迎回来");
     } catch (error) {
-      Modal.error({
-        title: "提示",
-        content: "账户密码输入错误",
-        okText: "确认",
-        centered: true,
-      });
+      message.error(error.message || "登录失败，请检查账号密码");
     } finally {
       setLoading(false);
     }
@@ -97,14 +92,14 @@ const LoginPage = () => {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center bg-cover bg-center bg-no-repeat relative p-4"
+      className="auth-shell min-h-screen flex flex-col items-center justify-center bg-cover bg-center bg-no-repeat relative p-4"
       style={{ backgroundImage: "url('/images/backlogin.webp')" }}
     >
       {/* 整体背景蒙版：增加一层极淡的白色透气感 */}
       <div className="absolute inset-0 bg-white/10 backdrop-blur-[2px]"></div>
 
       {/* 登录卡片 */}
-      <div className="relative z-10 w-full max-w-[480px] bg-white/60 backdrop-blur-2xl rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-white/40 p-10 animate-fade-in-up">
+      <div className="page-login-card relative z-10 w-full max-w-[480px] min-w-0 animate-fade-in-up rounded-[2rem] border border-white/40 bg-white/60 shadow-[0_20px_50px_rgba(0,0,0,0.1)] backdrop-blur-2xl">
         {/* 顶部徽标与标题 */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/80 shadow-sm mb-6 border border-white/50">

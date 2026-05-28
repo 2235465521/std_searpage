@@ -16,9 +16,10 @@ from .serializers import (
     StdPedigreeSerializer, StdReplaceSerializer, StdPedChainSerializer
 )
 
-from .models import StdPedChain, StdBase, StdReplace, StdGbDetail, StdHbDetail, StdDbDetail, StdTbDetail
-from .redis_circuit import safe_cache_get, safe_cache_set
+from .models import StdPedChain, StdBase, StdReplace
+from django.core.cache import cache as redis_cache
 from . import es_circuit
+from .std_type_util import normalize_std_type_code
 
 _STD_SEARCH_CACHE_TTL = 300
 
@@ -150,12 +151,6 @@ def _build_es_std_type_clause(std_type):
     return {"term": {"std_type.keyword": std_type}}
 
 
-def _safe_cache_get(key):
-    return safe_cache_get(key)
-
-def _safe_cache_set(key, value, timeout):
-    safe_cache_set(key, value, timeout)
-
 def search_standards(keyword=None, std_type=None, ex_state=None, page=1, size=20, need_total=True):
     """
     统一的搜索服务入口：优先尝试 Elasticsearch 检索。
@@ -163,7 +158,7 @@ def search_standards(keyword=None, std_type=None, ex_state=None, page=1, size=20
     ISO / IEC / IEEE 固定走 DB（std_base），确保能查到国际标准数据。
     """
     ck = f'std_search:v1:{keyword or ""}:{std_type or ""}:{ex_state}:{page}:{size}:{int(need_total)}'
-    cached = _safe_cache_get(ck)
+    cached = redis_cache.get(ck)
     if cached is not None:
         return cached
 
@@ -175,7 +170,7 @@ def search_standards(keyword=None, std_type=None, ex_state=None, page=1, size=20
         )
         items = list(qs.values(*SEARCH_LIST_FIELDS))
         result = (total, items)
-        _safe_cache_set(ck, result, _STD_SEARCH_CACHE_TTL)
+        redis_cache.set(ck, result, _STD_SEARCH_CACHE_TTL)
         return result
 
     query_body = {"bool": {"must": []}}
@@ -201,7 +196,7 @@ def search_standards(keyword=None, std_type=None, ex_state=None, page=1, size=20
         lambda: _search_via_elasticsearch(query_body, offset, size),
     )
     if es_result is not None:
-        _safe_cache_set(ck, es_result, _STD_SEARCH_CACHE_TTL)
+        redis_cache.set(ck, es_result, _STD_SEARCH_CACHE_TTL)
         return es_result
 
     total, qs = search_standards_in_db(
@@ -209,7 +204,7 @@ def search_standards(keyword=None, std_type=None, ex_state=None, page=1, size=20
     )
     items = list(qs.values(*SEARCH_LIST_FIELDS))
     result = (total, items)
-    _safe_cache_set(ck, result, _STD_SEARCH_CACHE_TTL)
+    redis_cache.set(ck, result, _STD_SEARCH_CACHE_TTL)
     return result
 
 def _normalize_replace_type_code(replace_type):
@@ -353,6 +348,68 @@ def _build_ped_chain_from_replace_history(std_id_str, replace_qs):
     return {'nodes': nodes, 'edges': edges}
 
 
+def _text_or_none(value):
+    text = (value or '').strip() if isinstance(value, str) else value
+    if text is None:
+        return None
+    if isinstance(text, str) and not text:
+        return None
+    return text
+
+
+def _detail_payload_from_view(view_obj):
+    if not view_obj:
+        return {}
+    return {
+        key: value
+        for key, value in {
+            'ics': _text_or_none(view_obj.ics),
+            'ccs': _text_or_none(view_obj.ccs),
+            'drafter': view_obj.drafter,
+            'report_unit': view_obj.report_unit,
+            'sub_report_unit': view_obj.sub_report_unit,
+            'industry_type': view_obj.industry_type,
+            'std_indu_type': view_obj.std_indu_type,
+            'record_no': view_obj.record_no,
+            'record_date': view_obj.record_date,
+            'rev_type': view_obj.rev_type,
+            'tech_committee': view_obj.tech_committee,
+            'approve_dept': view_obj.approve_dept,
+        }.items()
+        if value not in (None, '')
+    }
+
+
+def _merge_classification_fields(base_obj, detail_data=None):
+    payload = dict(detail_data or {})
+    view_obj = get_view_std_full_by_id(base_obj.std_id)
+    view_payload = _detail_payload_from_view(view_obj)
+
+    for key in ('ics', 'ccs'):
+        if not _text_or_none(payload.get(key)) and view_payload.get(key):
+            payload[key] = view_payload[key]
+
+    if not payload and view_payload:
+        payload.update(view_payload)
+    return payload
+
+
+def _serialize_detail_obj(base_obj, detail_obj):
+    if not detail_obj:
+        return None
+    code = normalize_std_type_code(base_obj.std_type, base_obj.std_type_no)
+    serializer_map = {
+        'GB': StdGbDetailSerializer,
+        'HB': StdHbDetailSerializer,
+        'DB': StdDbDetailSerializer,
+        'TB': StdTbDetailSerializer,
+    }
+    serializer_cls = serializer_map.get(code)
+    if not serializer_cls:
+        return None
+    return serializer_cls(detail_obj).data
+
+
 def get_full_standard_detail(std_id_str):
     """
     获取单条标准的聚合详情（涵盖基础信息、子表扩展、谱系与替代历史）
@@ -365,17 +422,8 @@ def get_full_standard_detail(std_id_str):
     pedigree_qs = get_pedigree_list(base_obj.id)
     replace_qs = get_replace_history(base_obj.id)
     
-    # 动态匹配对应类型的子表序列化器
-    detail_data = None
-    if detail_obj:
-        if isinstance(detail_obj, StdGbDetail):
-            detail_data = StdGbDetailSerializer(detail_obj).data
-        elif isinstance(detail_obj, StdHbDetail):
-            detail_data = StdHbDetailSerializer(detail_obj).data
-        elif isinstance(detail_obj, StdDbDetail):
-            detail_data = StdDbDetailSerializer(detail_obj).data
-        elif isinstance(detail_obj, StdTbDetail):
-            detail_data = StdTbDetailSerializer(detail_obj).data
+    detail_data = _serialize_detail_obj(base_obj, detail_obj)
+    detail_data = _merge_classification_fields(base_obj, detail_data)
             
     # 起草单位：优先 std_extend_h.draft_unit，再补子表 drafter 中的机构名（不补人名）
     from .models import StdExtendH
@@ -408,18 +456,23 @@ def get_full_standard_detail(std_id_str):
         ped_chain_data = _enrich_ped_chain_resolvability(ped_chain_data)
         ped_chain_data = _enrich_ped_chain_replace_types(ped_chain_data)
 
+    detail_payload = detail_data or {}
+    governing_unit = (
+        detail_payload.get('report_unit')
+        or detail_payload.get('tech_committee')
+        or detail_payload.get('issu_auth')
+        or '-'
+    )
+
     return {
         "base_info": {
             **StdBaseSerializer(base_obj).data,
             "internal_status": internal_status
         },
         "detail_info": {
-            **detail_data,
+            **detail_payload,
             "top_drafters": drafters_list,
-            "governing_unit": detail_data.get('report_unit') or detail_data.get('tech_committee') or detail_data.get('issu_auth') or '-'
-        } if detail_data else {
-            "top_drafters": drafters_list,
-            "governing_unit": "-"
+            "governing_unit": governing_unit,
         },
         "pedigree": StdPedigreeSerializer(pedigree_qs, many=True).data,
         "ped_chain": ped_chain_data,

@@ -163,7 +163,7 @@ const DetailPage = () => {
 
   if (loading && !detailData) {
     return (
-      <div className="min-h-screen pb-20 max-w-6xl mx-auto px-4 sm:px-6">
+      <div className="page-content mx-auto min-h-screen min-w-0 w-full max-w-6xl px-4 pb-20 sm:px-6">
         <motion.div className="flex items-center gap-5 mb-10 mt-8">
           <button
             type="button"
@@ -198,7 +198,8 @@ const DetailPage = () => {
   if (!detailData) {
     const isNotFound = !fetchError;
     return (
-      <div className="max-w-xl mx-auto mt-20 text-center p-12 bg-white rounded-3xl border border-slate-100 shadow-xl">
+      <div className="page-content mx-auto mt-20 max-w-xl min-w-0 px-4 text-center">
+        <div className="rounded-3xl border border-slate-100 bg-white p-8 shadow-xl sm:p-12">
         <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
           <AlertCircle size={40} className="text-slate-300" />
         </div>
@@ -241,6 +242,7 @@ const DetailPage = () => {
             返回
           </button>
         </div>
+        </div>
       </div>
     );
   }
@@ -255,29 +257,30 @@ const DetailPage = () => {
       : <AlertCircle size={12} />;
 
   return (
-    <div className="min-h-screen pb-20 max-w-6xl mx-auto px-4 sm:px-6 animate-in fade-in duration-700">
+    <div className="page-content mx-auto min-h-screen min-w-0 w-full max-w-6xl px-4 pb-20 sm:px-6 animate-in fade-in duration-700">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-10 mt-8">
-        <div className="flex items-center gap-5">
+      <div className="page-detail-header">
+        <div className="flex min-w-0 items-start gap-4 sm:items-center sm:gap-5">
           <button 
             onClick={handleBack} 
-            className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center shadow-sm text-slate-400 hover:text-blue-600 hover:border-blue-100 hover:bg-blue-50/30 transition-all group"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-100 bg-white text-slate-400 shadow-sm transition-all hover:border-blue-100 hover:bg-blue-50/30 hover:text-blue-600 group"
           >
             <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
           </button>
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight">{base_info.std_id}</h1>
+          <div className="min-w-0">
+            <div className="mb-1 flex flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="break-all text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">{base_info.std_id}</h1>
               <InternalStatusBadge
                 internalStatus={base_info.internal_status}
                 exState={base_info.ex_state}
                 icon={statusIcon}
               />
             </div>
-            <p className="text-slate-500 font-bold text-sm tracking-wide">{base_info.std_chinesename}</p>
+            <p className="text-sm font-bold tracking-wide text-slate-500 break-words">{base_info.std_chinesename}</p>
           </div>
         </div>
         
+        <div className="page-detail-header-actions">
         {fileStatusLoading ? (
           <button
             type="button"
@@ -310,10 +313,11 @@ const DetailPage = () => {
             {hasFile === null ? '尝试下载' : '下载源文件'}
           </button>
         )}
+        </div>
       </div>
 
       {/* Metadata Cards */}
-      <div className="mb-10 grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-6">
+      <div className="mb-10 page-detail-2col">
         <MetadataCard
           title="基础元数据"
           icon={FileText}

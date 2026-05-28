@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
-import { MAIN_NAV_ITEMS } from '../../config/nav';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import { getNavPageTitle } from '../../config/nav';
 
 function getDisplayUser() {
   const username =
@@ -13,18 +13,16 @@ function getDisplayUser() {
 
 export default function MobileTopBar() {
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const user = useMemo(() => getDisplayUser(), []);
 
-  const pageTitle = useMemo(() => {
-    if (location.pathname.startsWith('/detail/')) return '标准详情';
-    const match = MAIN_NAV_ITEMS.find((item) => location.pathname.startsWith(item.to));
-    if (match) return match.label;
-    if (location.pathname.startsWith('/register')) return '分配账号';
-    return '智审平台';
-  }, [location.pathname]);
+  const pageTitle = useMemo(
+    () => getNavPageTitle(location.pathname, searchParams),
+    [location.pathname, searchParams],
+  );
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-slate-200/70 bg-white/90 px-4 backdrop-blur-xl md:hidden">
+    <header className="layout-mobile-only fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-slate-200/70 bg-white/90 px-4 backdrop-blur-xl md:hidden">
       <div className="min-w-0">
         <p className="truncate text-sm font-bold text-slate-800">{pageTitle}</p>
       </div>

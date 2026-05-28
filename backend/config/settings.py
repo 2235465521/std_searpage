@@ -16,22 +16,15 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load .env file if it exists
-env_path = BASE_DIR / '.env'
-if env_path.exists():
-    with open(env_path, encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#'):
-                parts = line.split('=', 1)
-                if len(parts) == 2:
-                    os.environ[parts[0].strip()] = parts[1].strip()
+
+# Quick-start development settings - unsuitable for production
+# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-0sw$+79d4*d=+kqrya5a))k!ev979@x+fv%k-bqttrp5j3m6(s')
+SECRET_KEY = 'django-insecure-0sw$+79d4*d=+kqrya5a))k!ev979@x+fv%k-bqttrp5j3m6(s'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
+DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
@@ -92,11 +85,11 @@ pymysql.install_as_MySQLdb()
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.getenv('DB_NAME', 'mydate'),
-        'USER': os.getenv('DB_USER', 'root'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'lsj223546'),
-        'HOST': os.getenv('DB_HOST', '127.0.0.1'),
-        'PORT': os.getenv('DB_PORT', '3306'),
+        'NAME': 'mydate',
+        'USER': 'root',
+        'PASSWORD': 'root',
+        'HOST': '127.0.0.1',
+        'PORT': '3306',
         'OPTIONS': {
             'charset': 'utf8mb4',
         }
@@ -148,8 +141,8 @@ USE_I18N = True
 USE_TZ = True
 
 # Celery & Redis Configuration
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://127.0.0.1:6379/0')
-CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://127.0.0.1:6379/1')
+CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
+CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/1'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -159,21 +152,26 @@ CELERY_TIMEZONE = TIME_ZONE
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': os.getenv('REDIS_CACHE_URL', 'redis://127.0.0.1:6379/2'),
+        'LOCATION': 'redis://127.0.0.1:6379/2',
     }
 }
 
-# 标准源文件共享盘
-SHARED_DISK_DIR = os.getenv('SHARED_DISK_DIR', '/mnt/std_bk')
+# 标准源文件共享盘自适应配置（Windows 开发环境 vs Linux 部署环境）
+import platform
+if platform.system() == 'Windows':
+    SHARED_DISK_DIR = r'Z:\磁盘阵列\标准文件处理'
+else:
+    # Linux 部署环境（见 升级部署文档.md 中约定的大文件共享挂载目录）
+    SHARED_DISK_DIR = r'/mnt/std_bk/磁盘阵列/标准文件下载/'
 # 标准类别 -> 子文件夹映射（可按实际目录名在下方增改）
 SHARED_DISK_TYPE_FOLDERS = {
-    'GB': ['国标下载', 'word的国标', '待处理'],
-    'DB': ['地标下载', 'word的地标'],
-    'HB': ['行标下载', 'word的行标'],
-    'TB': ['团标下载', 'word的行标', '食品安全标准word版'],
-    'ISO': ['待处理', '国标下载', 'word的国标'],
-    'IEC': ['待处理', '国标下载', 'word的国标'],
-    'IEEE': ['待处理', '国标下载', 'word的国标'],
+    'GB': ['word的国标', '待处理'],
+    'DB': ['word的地标'],
+    'HB': ['word的行标'],
+    'TB': ['word的行标', '食品安全标准word版'],
+    'ISO': ['待处理', 'word的国标'],
+    'IEC': ['待处理', 'word的国标'],
+    'IEEE': ['待处理', 'word的国标'],
 }
 # 是否在分类目录未命中时递归整个根目录（慢，仅调试时开启）
 SHARED_DISK_DEEP_SEARCH = False
@@ -191,7 +189,6 @@ ES_CIRCUIT_MAX_FAILURES = int(os.getenv('ES_CIRCUIT_MAX_FAILURES', '2'))
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

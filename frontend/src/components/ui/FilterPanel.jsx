@@ -1,11 +1,12 @@
 import React from 'react';
+import { Input, Select } from 'antd';
 
 export function FilterField({ label, children, className = '', compact = false }) {
   return (
-    <div className={`min-w-0 ${className}`}>
+    <div className={`min-w-0 ${compact ? 'panel-filter-field-compact' : ''} ${className}`}>
       <p
         className={[
-          'block font-label text-xs font-medium text-on-surface-variant',
+          'panel-filter-label block font-label text-xs font-medium text-on-surface-variant',
           compact ? 'mb-0.5 leading-4' : 'mb-1 leading-5',
         ].join(' ')}
       >
@@ -16,13 +17,74 @@ export function FilterField({ label, children, className = '', compact = false }
   );
 }
 
+export const filterSelectSuffixIcon = (
+  <span className="material-symbols-outlined text-lg leading-none text-slate-400">expand_more</span>
+);
+
+function mergeClassName(base, extra) {
+  return [base, extra].filter(Boolean).join(' ');
+}
+
+function defaultMultiTagPlaceholder(omittedValues) {
+  if (!omittedValues?.length) return null;
+  const labels = omittedValues
+    .map((item) => (typeof item?.label === 'string' ? item.label : item?.value))
+    .filter(Boolean);
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return labels.join('、');
+  return `${labels.length} 项已选`;
+}
+
+/** 与标准检索页一致的 filled 下拉框 */
+export function FilterSelect({
+  className,
+  suffixIcon,
+  mode,
+  maxTagCount,
+  maxTagPlaceholder,
+  ...props
+}) {
+  const isMultiple = mode === 'multiple';
+
+  return (
+    <Select
+      variant="filled"
+      mode={mode}
+      className={mergeClassName(
+        'panel-filter-select w-full max-w-full',
+        isMultiple ? 'panel-filter-select-multiple' : '',
+        className,
+      )}
+      suffixIcon={suffixIcon ?? filterSelectSuffixIcon}
+      maxTagCount={isMultiple ? (maxTagCount ?? 0) : maxTagCount}
+      maxTagPlaceholder={
+        isMultiple
+          ? (maxTagPlaceholder ?? defaultMultiTagPlaceholder)
+          : maxTagPlaceholder
+      }
+      {...props}
+    />
+  );
+}
+
+/** 与标准检索页一致的 filled 输入框 */
+export function FilterInput({ className, ...props }) {
+  return (
+    <Input
+      variant="filled"
+      className={mergeClassName('panel-filter-input w-full', className)}
+      {...props}
+    />
+  );
+}
+
 export default function FilterPanel({ children, hint, actions, className = '', compact = false }) {
   const hasFooter = hint || actions;
 
   return (
     <div
       className={[
-        'glass-card rounded-xl',
+        'glass-card min-w-0 rounded-xl',
         compact ? 'mb-3 p-4' : 'mb-4 p-6',
         className,
       ].join(' ')}

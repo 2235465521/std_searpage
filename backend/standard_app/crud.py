@@ -4,10 +4,17 @@ from .models import (
     StdBase, StdGbDetail, StdHbDetail, StdDbDetail, StdTbDetail,
     StdPedigree, StdReplace, ViewStdFull
 )
-from .redis_circuit import safe_cache_get, safe_cache_set
+from .std_type_util import normalize_std_type_code
 
 # 国际标准类：数据在 std_base 中，view_std_full 宽表可能未覆盖
 INTL_STD_TYPES = frozenset({'ISO', 'IEC', 'IEEE'})
+
+_DETAIL_MODEL_BY_CODE = {
+    'GB': StdGbDetail,
+    'HB': StdHbDetail,
+    'DB': StdDbDetail,
+    'TB': StdTbDetail,
+}
 
 SEARCH_LIST_FIELDS = (
     'id', 'std_id', 'std_type', 'std_type_no', 'std_chinesename',
@@ -45,30 +52,15 @@ def get_standard_detail(base_obj):
     """根据基础对象及其类型，获取对应的详细信息"""
     if not base_obj:
         return None
-    
-    std_type_no = base_obj.std_type_no
-    
-    # 优先根据 std_type_no 进行查找
+
+    code = normalize_std_type_code(base_obj.std_type, base_obj.std_type_no)
+    model = _DETAIL_MODEL_BY_CODE.get(code)
+    if not model:
+        return None
     try:
-        if std_type_no == '00':
-            return StdGbDetail.objects.get(base=base_obj)
-        elif std_type_no == '01':
-            return StdHbDetail.objects.get(base=base_obj)
-        elif std_type_no == '02':
-            return StdDbDetail.objects.get(base=base_obj)
-        elif std_type_no == '03':
-            return StdTbDetail.objects.get(base=base_obj)
+        return model.objects.get(base=base_obj)
     except ObjectDoesNotExist:
-        pass
-    
-    # 兜底：如果基于 std_type_no 查找失败，或者 std_type_no 对应的分类不正确，则遍历所有详情表进行查找
-    for detail_model in [StdGbDetail, StdHbDetail, StdDbDetail, StdTbDetail]:
-        try:
-            return detail_model.objects.get(base=base_obj)
-        except ObjectDoesNotExist:
-            continue
-            
-    return None
+        return None
 
 def get_pedigree_list(base_id):
     """获取标准的谱系信息"""
@@ -99,7 +91,7 @@ def search_standards_in_db(keyword=None, std_type=None, ex_state=None, limit=20,
 
     if keyword:
         qs = qs.filter(
-            Q(std_id__istartswith=keyword)
+            Q(std_id__icontains=keyword)
             | Q(std_chinesename__icontains=keyword)
             | Q(std_englishname__icontains=keyword)
         )
@@ -112,11 +104,7 @@ def search_standards_in_db(keyword=None, std_type=None, ex_state=None, limit=20,
 
     items = qs[offset:offset + limit]
     if need_total:
-        cache_key = f"std_count:{keyword or ''}:{std_type or ''}:{ex_state or ''}"
-        total = safe_cache_get(cache_key)
-        if total is None:
-            total = qs.count()
-            safe_cache_set(cache_key, total, 86400)
+        total = qs.count()
     else:
         total = -1
 

@@ -77,7 +77,7 @@ const makeHorizontalBarOption = ({ title, rows, nameKey = 'name', valueKey = 'co
     textStyle: { fontSize: 14, fontWeight: 600 },
   },
   tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-  grid: { left: 120, right: 24, top: 44, bottom: 24 },
+  grid: { left: '18%', right: 24, top: 44, bottom: 24 },
   xAxis: {
     type: 'value',
     axisLabel: { color: '#64748b' },
@@ -160,10 +160,10 @@ const DraftingUnitStats = () => {
   const returnPath = `/units?${returnSearch}`;
 
   return (
-    <div className="animate-fade-in-up max-w-6xl pb-8">
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <h2 className="font-headline font-bold text-[1.5rem] text-on-surface">{T.pageTitle}</h2>
-        <div className="flex gap-2">
+    <div className="page-content animate-fade-in-up min-w-0 w-full pb-8">
+      <div className="page-stats-toolbar">
+        <h2 className="font-headline text-xl font-bold text-on-surface sm:text-[1.5rem]">{T.pageTitle}</h2>
+        <div className="flex flex-wrap gap-2">
           <Button size="small" onClick={() => navigate(returnPath, { state: { fromStats: true } })}>
             {T.back}
           </Button>
@@ -182,7 +182,7 @@ const DraftingUnitStats = () => {
         </div>
       ) : analysis ? (
         <div className="glass-card rounded-xl p-4 mb-4 bg-white/95">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+          <div className="page-grid-cols-3 mb-3">
             <div className="rounded-lg bg-slate-50 px-3 py-2">
               <div className="text-xs text-on-surface-variant">{T.totalStandards}</div>
               <div className="text-lg font-semibold text-primary">{analysis?.total ?? 0}</div>

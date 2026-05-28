@@ -22,7 +22,7 @@ export default function ReplaceHistoryTimeline({
   const visibleItems = expanded || hiddenCount === 0 ? list : list.slice(0, maxVisible);
 
   return (
-    <div className="mb-6 rounded-xl border border-slate-100 bg-slate-50/60 p-4 md:p-5">
+    <div className="page-card-pad mb-6 rounded-xl border border-slate-100 bg-slate-50/60">
       <div className="mb-4 flex items-center gap-2">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-blue-600 shadow-sm ring-1 ring-slate-100">
           <ArrowRightLeft size={15} />

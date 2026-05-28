@@ -62,8 +62,8 @@ const Register = () => {
   };
 
   return (
-    <div className="animate-fade-in-up flex justify-center py-4 md:py-8">
-      <div className="w-full max-w-lg rounded-[2rem] border border-white/80 bg-white/75 p-8 shadow-[0_20px_50px_rgba(0,88,188,0.08)] backdrop-blur-2xl md:p-10">
+    <div className="animate-fade-in-up page-register-wrap flex justify-center py-4">
+      <div className="page-card-pad w-full max-w-lg min-w-0 rounded-[2rem] border border-white/80 bg-white/75 shadow-[0_20px_50px_rgba(0,88,188,0.08)] backdrop-blur-2xl">
         <div className="mb-8 text-center">
           <div className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl border border-white/50 bg-white/80 shadow-sm">
             <UserAddOutlined className="text-2xl text-blue-700" />
@@ -136,7 +136,7 @@ const Register = () => {
             <Radio.Group
               onChange={handleRoleChange}
               value={formData.role}
-              className="grid w-full grid-cols-2 gap-3"
+              className="page-grid-cols-2 w-full"
             >
               <Radio.Button value="user" className="h-11 rounded-xl text-center leading-[2.75rem]">
                 普通业务员

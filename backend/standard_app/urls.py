@@ -6,6 +6,7 @@ from .views import (
     AIComplianceEvaluationView, TaskStatusView, UserRegisterView, UserSelfRegisterView,
     AnalyticsRegionsView, AnalyticsSummaryView, AnalyticsYearCompareView, AnalyticsYearRangeView, AnalyticsExportView,
     UnitSearchView, UnitStandardsView, UnitExportView, UnitFirstLeadView, UnitFirstParticipationView,
+    UnitFirstParticipationExportView,
 )
 
 urlpatterns = [
@@ -34,6 +35,7 @@ urlpatterns = [
     path('units/export', UnitExportView.as_view(), name='unit_export'),
     path('units/first-lead', UnitFirstLeadView.as_view(), name='unit_first_lead'),
     path('units/first-participation', UnitFirstParticipationView.as_view(), name='unit_first_participation'),
+    path('units/first-participation/export', UnitFirstParticipationExportView.as_view(), name='unit_first_participation_export'),
     path('units/<path:std_id>/drafters', UnitStandardsView.as_view(), name='unit_drafters'),
 
     # AI Tasks

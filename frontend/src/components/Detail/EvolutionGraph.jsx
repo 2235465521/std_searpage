@@ -112,7 +112,9 @@ export default function EvolutionGraph({ chainData, currentStdId, returnPath, pa
       const height = Math.max(Math.floor(rect.height), 400);
       if (width < 50 || height < 50) return;
 
-      const margin = { top: 56, right: 40, bottom: 72, left: 40 };
+      const margin = { top: 48, right: 40, bottom: 80, left: 40 };
+      const LABEL_OFFSET_Y = 30;
+      const LABEL_LINE_HEIGHT = 14;
 
       const svg = d3.select(svgEl)
         .attr('viewBox', [0, 0, width, height])
@@ -214,8 +216,8 @@ export default function EvolutionGraph({ chainData, currentStdId, returnPath, pa
       const innerH = height - margin.top - margin.bottom;
       const treeLayout = d3.tree().size([innerW, innerH]);
       treeLayout.separation((a, b) => {
-        const spread = isWideTree ? 1.35 : nodeCount > 3 ? 1.1 : 1;
-        return (a.parent === b.parent ? 1 : 1.2) * spread;
+        const spread = isWideTree ? 1.5 : nodeCount > 3 ? 1.2 : 1.05;
+        return (a.parent === b.parent ? 1.15 : 1.35) * spread;
       });
 
       function buildHierarchy(nodeId) {
@@ -280,23 +282,47 @@ export default function EvolutionGraph({ chainData, currentStdId, returnPath, pa
           });
       };
 
-      const escapeHtml = (value) => (
-        String(value)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-      );
+      const truncateLabel = (value, maxLen = 22) => {
+        const text = String(value || '');
+        return text.length > maxLen ? `${text.slice(0, maxLen - 1)}…` : text;
+      };
 
-      const getParentReplaceText = (nodeId) => {
-        const parentId = parentMap.get(nodeId);
-        if (!parentId) return '';
-        const edgeMeta = edgeMetaMap.get(edgeMetaKey(parentId, nodeId)) || defaultEdgeMeta;
-        const replaceLabel = edgeMeta.replace_label;
-        if (replaceLabel && replaceLabel !== '未知') {
-          return `${replaceLabel} · 替代 ${parentId}`;
+      const appendNodeLabel = (nodeGroup, d) => {
+        const id = d.data.id;
+        const isCurrent = id === currentStdId;
+        const lines = [
+          { text: truncateLabel(id), fill: '#1e293b', weight: 700, size: 12 },
+        ];
+        if (isCurrent) {
+          lines.push({ text: '当前标准', fill: '#dc2626', weight: 600, size: 11 });
         }
-        return `替代 ${parentId}`;
+
+        const labelGroup = nodeGroup
+          .append('g')
+          .attr('class', 'node-label')
+          .attr('pointer-events', 'none');
+
+        const textNode = labelGroup
+          .append('text')
+          .attr('text-anchor', 'middle')
+          .attr('x', 0)
+          .attr('y', LABEL_OFFSET_Y)
+          .attr('font-family', 'system-ui, -apple-system, sans-serif');
+
+        lines.forEach((line, index) => {
+          textNode
+            .append('tspan')
+            .attr('x', 0)
+            .attr('dy', index === 0 ? 0 : LABEL_LINE_HEIGHT)
+            .attr('fill', line.fill)
+            .attr('font-size', line.size)
+            .attr('font-weight', line.weight)
+            .text(line.text);
+        });
+
+        if (id.length > 22) {
+          labelGroup.append('title').text(id);
+        }
       };
 
       const buildHoverOverlay = (d) => {
@@ -321,7 +347,6 @@ export default function EvolutionGraph({ chainData, currentStdId, returnPath, pa
             : openable
               ? '点击查看详情'
               : '未收录，不可点击',
-          extra: getParentReplaceText(id),
         };
       };
 
@@ -417,27 +442,9 @@ export default function EvolutionGraph({ chainData, currentStdId, returnPath, pa
         .attr('stroke-width', (d) => (d.data.id === currentStdId ? 0 : 2))
         .attr('opacity', (d) => (canOpenDetail(d.data.id) ? 1 : 0.65));
 
-      nodeGroups
-        .append('foreignObject')
-        .attr('class', 'node-label')
-        .attr('x', -78)
-        .attr('y', 22)
-        .attr('width', 156)
-        .attr('height', 64)
-        .attr('pointer-events', 'none')
-        .append('xhtml:div')
-        .style('font-family', 'system-ui, -apple-system, sans-serif')
-        .style('text-align', 'center')
-        .style('line-height', '1.35')
-        .html((d) => {
-          const id = d.data.id;
-          const isCurrent = id === currentStdId;
-          let html = `<div style="font-size:13px;font-weight:700;color:#1e293b;">${escapeHtml(id)}</div>`;
-          if (isCurrent) {
-            html += '<div style="font-size:12px;font-weight:600;color:#dc2626;margin-top:3px;">当前标准</div>';
-          }
-          return html;
-        });
+      nodeGroups.each(function (d) {
+        appendNodeLabel(d3.select(this), d);
+      });
 
       const currentNode = treeNodes.find((d) => d.data.id === currentStdId);
       const centerOnCurrent = () => {
@@ -473,7 +480,7 @@ export default function EvolutionGraph({ chainData, currentStdId, returnPath, pa
   return (
     <div
       className={[
-        'relative h-[550px] w-full overflow-hidden bg-gradient-to-b from-slate-50/40 to-white',
+        'relative min-h-[360px] h-[clamp(360px,55vh,560px)] w-full min-w-0 overflow-hidden bg-gradient-to-b from-slate-50/40 to-white',
         embedded
           ? 'rounded-xl border border-slate-100'
           : 'rounded-[32px] border border-slate-100',
@@ -499,9 +506,6 @@ export default function EvolutionGraph({ chainData, currentStdId, returnPath, pa
           >
             <p className="text-sm font-bold leading-snug text-slate-800">{hoverOverlay.label}</p>
             <p className="mt-1 text-xs font-medium text-slate-600">{hoverOverlay.sub}</p>
-            {hoverOverlay.extra ? (
-              <p className="mt-1 text-xs leading-snug text-slate-500">{hoverOverlay.extra}</p>
-            ) : null}
           </div>
         )}
 
@@ -527,7 +531,7 @@ export default function EvolutionGraph({ chainData, currentStdId, returnPath, pa
                   </span>
                 </span>
               ) : (
-                <span>悬停节点查看标准号 · 实线圆点可点击</span>
+                <span>查看标准号 · 实线圆点可点击</span>
               )}
             </div>
 

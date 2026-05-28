@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { message, Select, Table, Tabs } from 'antd';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import { message, Tabs } from 'antd';
 import {
   downloadBlobResponse,
   exportAnalyticsExcel,
@@ -18,14 +19,16 @@ import {
 } from '../../utils/sessionAutoQuery';
 import AnalyticsCharts from './components/AnalyticsCharts';
 import YearAnalysisPanel from './components/YearAnalysisPanel';
-import PageHeader from '../../components/ui/PageHeader';
 import FilterPanel, {
   FilterField,
   FilterPrimaryButton,
   FilterSecondaryButton,
+  FilterSelect,
 } from '../../components/ui/FilterPanel';
 import LoadingPanel from '../../components/ui/LoadingPanel';
 import EmptyState from '../../components/ui/EmptyState';
+import GlassDataTable, { TypeTag } from '../../components/ui/GlassDataTable';
+import { resolveAnalyticsTab } from '../../config/nav';
 import {
   buildRegionKey,
   getPageSnapshot,
@@ -125,12 +128,10 @@ const normalizeStdScopeValues = (values, fallback = ['00']) => {
 };
 
 const TABLE_SCROLL_Y = 400;
-const selectSuffix = (
-  <span className="material-symbols-outlined text-lg text-slate-400">expand_more</span>
-);
-
+const BREAKDOWN_MIN_WIDTH = 200 + STD_TYPE_CODES.length * 96;
 const DataAnalysis = () => {
   const restoredSnapshot = useMemo(() => getPageSnapshot(), []);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [provinces, setProvinces] = useState(restoredSnapshot?.provinces ?? []);
   const [cities, setCities] = useState(restoredSnapshot?.cities ?? []);
@@ -168,7 +169,7 @@ const DataAnalysis = () => {
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [loadingRange, setLoadingRange] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [resultTab, setResultTab] = useState(restoredSnapshot?.resultTab ?? 'table');
+  const [resultTab, setResultTab] = useState(() => resolveAnalyticsTab(searchParams, restoredSnapshot?.resultTab ?? 'table'));
   const [bootstrapReady, setBootstrapReady] = useState(!!restoredSnapshot?.bootstrapReady);
   const shouldAutoQueryOnInitRef = useRef(
     !initialSummary && shouldPageAutoQueryOnFirstVisit(AUTO_QUERY_PAGES.ANALYTICS),
@@ -183,6 +184,24 @@ const DataAnalysis = () => {
   const skipCountyCascadeRef = useRef(
     !!(restoredSnapshot?.province && restoredSnapshot?.city && restoredSnapshot?.counties?.length),
   );
+
+  const applyResultTab = useCallback((tab) => {
+    setResultTab(tab);
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      if (tab === 'table') params.delete('tab');
+      else params.set('tab', tab);
+      return params;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.pathname !== '/analytics') return;
+    const nextTab = resolveAnalyticsTab(searchParams, 'table');
+    if (nextTab !== resultTab) setResultTab(nextTab);
+  }, [location.pathname, searchParams, resultTab]);
 
   const regionParams = useMemo(
     () => ({
@@ -316,7 +335,7 @@ const DataAnalysis = () => {
           setFilterYear(data.latest_year);
         }
 
-        if (!initialSummary) {
+        if (shouldAutoQueryOnInitRef.current && !initialSummary) {
           shouldAutoQueryOnInitRef.current = false;
           loadSummaryRef.current?.(
             {
@@ -379,7 +398,7 @@ const DataAnalysis = () => {
       setSummary(data);
       setCompare(null);
       if (!extras.keepResultTab) {
-        setResultTab('table');
+        applyResultTab('table');
       }
       markPageAutoQueryDone(AUTO_QUERY_PAGES.ANALYTICS);
       persistSnapshot({
@@ -389,7 +408,7 @@ const DataAnalysis = () => {
         regionKey: key,
       });
     },
-    [persistSnapshot, resultTab],
+    [persistSnapshot, resultTab, applyResultTab],
   );
 
   const loadBreakdownOnly = useCallback(
@@ -521,14 +540,14 @@ const DataAnalysis = () => {
       const data = await fetchYearCompare({ ...scopeParams, year_a: yearA, year_b: yearB });
       setCompare(data);
       setYearAnalysisMode('compare');
-      setResultTab('year');
+      applyResultTab('year');
       persistSnapshot({ compare: data, yearAnalysisMode: 'compare', resultTab: 'year' });
     } catch (e) {
       message.error(e.message || T.compareFail);
     } finally {
       setLoadingCompare(false);
     }
-  }, [scopeParams, yearA, yearB, persistSnapshot]);
+  }, [scopeParams, yearA, yearB, persistSnapshot, applyResultTab]);
 
   const loadYearRange = useCallback(async () => {
     if (!yearFrom || !yearTo) {
@@ -544,14 +563,14 @@ const DataAnalysis = () => {
       });
       setYearRange(data);
       setYearAnalysisMode('range');
-      setResultTab('year');
+      applyResultTab('year');
       persistSnapshot({ yearRange: data, yearAnalysisMode: 'range', resultTab: 'year' });
     } catch (e) {
       message.error(e.message || T.rangeFail);
     } finally {
       setLoadingRange(false);
     }
-  }, [scopeParams, yearFrom, yearTo, persistSnapshot]);
+  }, [scopeParams, yearFrom, yearTo, persistSnapshot, applyResultTab]);
 
   const handleExport = async () => {
     setExporting(true);
@@ -577,100 +596,131 @@ const DataAnalysis = () => {
 
   const breakdownColumns = useMemo(() => {
     const typeCols = STD_TYPE_CODES.map((code) => ({
-      title: STD_TYPE_LABELS[code] || code,
       key: code,
-      width: 100,
+      title: STD_TYPE_LABELS[code] || code,
       align: 'right',
-      render: (_, row) => (row.counts?.[code] ?? 0).toLocaleString(),
+      cellClassName: 'tabular-nums font-medium text-on-surface-variant',
+      render: (row) => (row.counts?.[code] ?? 0).toLocaleString(),
     }));
     return [
-      { title: T.regionCol, dataIndex: 'region_name', key: 'region_name', fixed: 'left', width: 110 },
       {
-        title: T.total,
-        dataIndex: 'total',
+        key: 'region_name',
+        title: T.regionCol,
+        headerClassName: 'sticky left-0 z-20 bg-surface-container-low/95 backdrop-blur-sm',
+        cellClassName:
+          'sticky left-0 z-10 whitespace-nowrap bg-white/95 font-semibold text-on-surface group-hover:bg-blue-50/50',
+        render: (row) => row.region_name,
+      },
+      {
         key: 'total',
-        width: 90,
+        title: T.total,
         align: 'right',
-        fixed: 'left',
-        render: (v) => v?.toLocaleString?.() ?? v,
+        cellClassName: 'font-bold tabular-nums text-primary',
+        render: (row) => row.total?.toLocaleString?.() ?? row.total,
       },
       ...typeCols,
     ];
   }, []);
 
-  const summaryColumns = [
-    { title: T.stdCategory, dataIndex: 'label', key: 'label' },
-    { title: T.typeCode, dataIndex: 'std_type', key: 'std_type', width: 100 },
-    {
-      title: T.count,
-      dataIndex: 'count',
-      key: 'count',
-      width: 120,
-      render: (v) => v?.toLocaleString?.() ?? v,
-    },
-  ];
+  const summaryColumns = useMemo(
+    () => [
+      {
+        key: 'label',
+        title: T.stdCategory,
+        cellClassName: 'font-medium text-on-surface',
+        render: (row) => row.label,
+      },
+      {
+        key: 'std_type',
+        title: T.typeCode,
+        render: (row) => <TypeTag code={row.std_type} />,
+      },
+      {
+        key: 'count',
+        title: T.count,
+        align: 'right',
+        cellClassName: 'font-bold tabular-nums text-primary',
+        render: (row) => row.count?.toLocaleString?.() ?? row.count,
+      },
+    ],
+    [],
+  );
 
-  const compareColumns = [
-    { title: T.stdCategory, dataIndex: 'label', key: 'label' },
-    { title: T.type, dataIndex: 'std_type', key: 'std_type', width: 80 },
-    {
-      title: compare ? `${compare.year_a} ${T.yearPublish}` : T.yearA,
-      dataIndex: 'count_a',
-      key: 'count_a',
-      render: (v) => v?.toLocaleString?.() ?? v,
-    },
-    {
-      title: compare ? `${compare.year_b} ${T.yearPublish}` : T.yearB,
-      dataIndex: 'count_b',
-      key: 'count_b',
-      render: (v) => v?.toLocaleString?.() ?? v,
-    },
-    {
-      title: T.delta,
-      dataIndex: 'delta',
-      key: 'delta',
-      align: 'right',
-      render: (v) => (
-        <span
-          className={[
-            'inline-flex min-w-[3rem] justify-end rounded-full px-2 py-0.5 text-xs font-bold',
-            v > 0 ? 'bg-emerald-50 text-emerald-700' : v < 0 ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-500',
-          ].join(' ')}
-        >
-          {v > 0 ? `+${v.toLocaleString()}` : v?.toLocaleString?.() ?? v}
-        </span>
-      ),
-    },
-  ];
+  const compareColumns = useMemo(
+    () => [
+      {
+        key: 'label',
+        title: T.stdCategory,
+        cellClassName: 'font-medium text-on-surface',
+        render: (row) => row.label,
+      },
+      {
+        key: 'std_type',
+        title: T.type,
+        render: (row) => <TypeTag code={row.std_type} />,
+      },
+      {
+        key: 'count_a',
+        title: compare ? `${compare.year_a} ${T.yearPublish}` : T.yearA,
+        align: 'right',
+        cellClassName: 'tabular-nums font-medium text-on-surface-variant',
+        render: (row) => row.count_a?.toLocaleString?.() ?? row.count_a,
+      },
+      {
+        key: 'count_b',
+        title: compare ? `${compare.year_b} ${T.yearPublish}` : T.yearB,
+        align: 'right',
+        cellClassName: 'tabular-nums font-medium text-on-surface-variant',
+        render: (row) => row.count_b?.toLocaleString?.() ?? row.count_b,
+      },
+      {
+        key: 'delta',
+        title: T.delta,
+        align: 'right',
+        render: (row) => {
+          const v = row.delta;
+          return (
+            <span
+              className={[
+                'inline-flex min-w-[3rem] justify-end rounded-full px-2 py-0.5 text-xs font-bold tabular-nums',
+                v > 0 ? 'bg-emerald-50 text-emerald-700' : v < 0 ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-500',
+              ].join(' ')}
+            >
+              {v > 0 ? `+${v.toLocaleString()}` : v?.toLocaleString?.() ?? v}
+            </span>
+          );
+        },
+      },
+    ],
+    [compare],
+  );
 
   const rangeTrendColumns = useMemo(() => {
     const typeCols = STD_TYPE_CODES.map((code) => ({
-      title: STD_TYPE_LABELS[code] || code,
       key: code,
-      width: 96,
+      title: STD_TYPE_LABELS[code] || code,
       align: 'right',
-      render: (_, row) => {
+      cellClassName: 'tabular-nums font-medium text-on-surface-variant',
+      render: (row) => {
         const match = (row.by_type || []).find((item) => item.std_type === code);
         return (match?.count ?? 0).toLocaleString();
       },
     }));
     return [
       {
-        title: T.filterYear,
-        dataIndex: 'year',
         key: 'year',
-        width: 88,
-        fixed: 'left',
-        render: (v) => `${v}年`,
+        title: T.filterYear,
+        headerClassName: 'sticky left-0 z-20 bg-surface-container-low/95 backdrop-blur-sm',
+        cellClassName:
+          'sticky left-0 z-10 whitespace-nowrap bg-white/95 font-semibold text-on-surface group-hover:bg-blue-50/50',
+        render: (row) => `${row.year}年`,
       },
       {
-        title: T.total,
-        dataIndex: 'total',
         key: 'total',
-        width: 90,
+        title: T.total,
         align: 'right',
-        fixed: 'left',
-        render: (v) => v?.toLocaleString?.() ?? v,
+        cellClassName: 'font-bold tabular-nums text-primary',
+        render: (row) => row.total?.toLocaleString?.() ?? row.total,
       },
       ...typeCols,
     ];
@@ -678,30 +728,37 @@ const DataAnalysis = () => {
 
   const rangeTypeColumns = useMemo(
     () => [
-      { title: T.stdCategory, dataIndex: 'label', key: 'label' },
-      { title: T.type, dataIndex: 'std_type', key: 'std_type', width: 80 },
       {
-        title: T.rangeTotal,
-        dataIndex: 'count',
+        key: 'label',
+        title: T.stdCategory,
+        cellClassName: 'font-medium text-on-surface',
+        render: (row) => row.label,
+      },
+      {
+        key: 'std_type',
+        title: T.type,
+        render: (row) => <TypeTag code={row.std_type} />,
+      },
+      {
         key: 'count',
-        width: 100,
+        title: T.rangeTotal,
         align: 'right',
-        render: (v) => v?.toLocaleString?.() ?? v,
+        cellClassName: 'font-bold tabular-nums text-primary',
+        render: (row) => row.count?.toLocaleString?.() ?? row.count,
       },
       {
-        title: T.avgPerYear,
-        dataIndex: 'avg_per_year',
         key: 'avg_per_year',
-        width: 90,
+        title: T.avgPerYear,
         align: 'right',
+        cellClassName: 'tabular-nums font-medium text-on-surface-variant',
+        render: (row) => row.avg_per_year,
       },
       {
-        title: T.sharePct,
-        dataIndex: 'share_pct',
         key: 'share_pct',
-        width: 80,
+        title: T.sharePct,
         align: 'right',
-        render: (v) => `${v ?? 0}%`,
+        cellClassName: 'tabular-nums font-medium text-on-surface-variant',
+        render: (row) => `${row.share_pct ?? 0}%`,
       },
     ],
     [],
@@ -710,23 +767,30 @@ const DataAnalysis = () => {
   const rangeDetailColumns = useMemo(() => {
     const years = yearRange?.years || [];
     const yearCols = years.map((y) => ({
-      title: `${y}年`,
       key: `y-${y}`,
-      width: 88,
+      title: `${y}年`,
       align: 'right',
-      render: (_, row) => (row.year_counts?.[y] ?? row.year_counts?.[String(y)] ?? 0).toLocaleString(),
+      cellClassName: 'tabular-nums font-medium text-on-surface-variant',
+      render: (row) => (row.year_counts?.[y] ?? row.year_counts?.[String(y)] ?? 0).toLocaleString(),
     }));
     return [
-      { title: T.stdCategory, dataIndex: 'label', key: 'label', fixed: 'left', width: 110 },
+      {
+        key: 'label',
+        title: T.stdCategory,
+        headerClassName: 'sticky left-0 z-20 bg-surface-container-low/95 backdrop-blur-sm',
+        cellClassName:
+          'sticky left-0 z-10 bg-white/95 font-medium text-on-surface group-hover:bg-blue-50/50',
+        render: (row) => row.label,
+      },
       ...yearCols,
       {
-        title: T.rangeTotal,
-        dataIndex: 'total',
         key: 'total',
-        width: 96,
+        title: T.rangeTotal,
         align: 'right',
-        fixed: 'right',
-        render: (v) => v?.toLocaleString?.() ?? v,
+        headerClassName: 'sticky right-0 z-20 bg-surface-container-low/95 backdrop-blur-sm',
+        cellClassName:
+          'sticky right-0 z-10 bg-white/95 font-bold tabular-nums text-primary group-hover:bg-blue-50/50',
+        render: (row) => row.total?.toLocaleString?.() ?? row.total,
       },
     ];
   }, [yearRange?.years]);
@@ -735,22 +799,24 @@ const DataAnalysis = () => {
     if (!summary) return [];
 
     const tableNode = summary.breakdown?.length ? (
-      <Table
+      <GlassDataTable
+        columns={breakdownColumns}
+        data={summary.breakdown}
         rowKey="region_name"
-        size="small"
-        scroll={{ x: 800, y: TABLE_SCROLL_Y }}
+        minWidth={BREAKDOWN_MIN_WIDTH}
+        maxBodyHeight={TABLE_SCROLL_Y}
+        compact
+        footerItemLabel="个区域"
+        emptyIcon="map"
+        emptyTitle="暂无分区明细"
         pagination={{
           pageSize:
             summary?.breakdown_level === 'province'
               ? 34
               : Math.min(100, Math.max(20, summary.breakdown?.length || 20)),
-          pageSizeOptions: ['20', '34', '50', '100'],
+          pageSizeOptions: [20, 34, 50, 100],
           showSizeChanger: true,
-          showTotal: (n) => `\u5171 ${n} \u6761`,
-          size: 'small',
         }}
-        columns={breakdownColumns}
-        dataSource={summary.breakdown}
       />
     ) : (
       <div className="space-y-3">
@@ -772,13 +838,16 @@ const DataAnalysis = () => {
             </button>
           </div>
         ) : null}
-        <Table
-          rowKey="std_type"
-          size="small"
-          scroll={{ y: TABLE_SCROLL_Y }}
-          pagination={false}
+        <GlassDataTable
           columns={summaryColumns}
-          dataSource={summary.by_type || []}
+          data={summary.by_type || []}
+          rowKey="std_type"
+          minWidth={480}
+          maxBodyHeight={TABLE_SCROLL_Y}
+          compact
+          footerItemLabel="个类别"
+          emptyIcon="category"
+          emptyTitle="暂无类别统计"
         />
       </div>
     );
@@ -814,11 +883,7 @@ const DataAnalysis = () => {
       {
         key: 'table',
         label: T.tabTable,
-        children: (
-          <div className="pt-1">
-            <div className="overflow-x-auto">{tableNode}</div>
-          </div>
-        ),
+        children: <div className="pt-1">{tableNode}</div>,
       },
       {
         key: 'bar',
@@ -859,18 +924,7 @@ const DataAnalysis = () => {
   ]);
 
   return (
-    <div className="animate-fade-in-up max-w-6xl pb-8">
-      <PageHeader
-        compact
-        title={T.pageTitle}
-        subtitle="按行政区划与标准类别统计发布数量，支持表格、图表、两年对比与年段统计"
-        badge={
-          summary?.total != null
-            ? `${summary.total.toLocaleString()} 条${loadingBreakdown ? ' · 明细加载中' : ''}`
-            : undefined
-        }
-      />
-
+    <div className="page-content animate-fade-in-up min-w-0 w-full pb-8">
       <FilterPanel
         compact
         hint={
@@ -900,69 +954,63 @@ const DataAnalysis = () => {
           </>
         }
       >
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="page-grid-cols-5">
           <FilterField compact label={T.province}>
-            <Select
+            <FilterSelect
               allowClear
               placeholder={T.provincePh}
               options={provinces}
               value={province}
               onChange={handleProvinceChange}
-              suffixIcon={selectSuffix}
             />
           </FilterField>
           <FilterField compact label={T.city}>
-            <Select
+            <FilterSelect
               allowClear
               placeholder={T.allCitiesPh}
               disabled={!province}
               options={cities}
               value={city ?? null}
               onChange={handleCityChange}
-              suffixIcon={selectSuffix}
             />
           </FilterField>
           <FilterField compact label={T.county}>
-            <Select
+            <FilterSelect
               allowClear
               placeholder={T.allCountiesPh}
               disabled={!province || !city}
               options={counties}
               value={county ?? null}
               onChange={handleCountyChange}
-              suffixIcon={selectSuffix}
             />
           </FilterField>
           <FilterField compact label={T.filterYear}>
-            <Select
+            <FilterSelect
               options={YEAR_OPTIONS}
               value={filterYear}
               onChange={(y) => {
                 setFilterYear(y);
                 invalidateResults();
               }}
-              suffixIcon={selectSuffix}
             />
           </FilterField>
           <FilterField compact label={T.stdCategory}>
-            <Select
+            <FilterSelect
               allowClear
               mode="multiple"
-              maxTagCount="responsive"
               options={STD_SCOPE_OPTIONS}
               value={stdScope}
               onChange={(vals) => {
                 setStdScope(vals || []);
                 invalidateResults();
               }}
-              suffixIcon={selectSuffix}
             />
           </FilterField>
         </div>
       </FilterPanel>
 
       {summary ? (
-        <div className="glass-card overflow-hidden rounded-xl p-3 md:p-4">
+        <div className="glass-card page-card-pad-sm min-w-0 rounded-xl">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold text-on-surface">
               {T.regionStats}
@@ -978,7 +1026,7 @@ const DataAnalysis = () => {
           <Tabs
             className="analytics-result-tabs"
             activeKey={resultTab}
-            onChange={setResultTab}
+            onChange={applyResultTab}
             destroyInactiveTabPane
             items={resultTabItems}
           />

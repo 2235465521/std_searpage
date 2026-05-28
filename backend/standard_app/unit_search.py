@@ -3,13 +3,13 @@ from collections import defaultdict
 from io import BytesIO
 import re
 
+from django.core.cache import cache
 from django.db import connection
 from django.db.models import Exists, OuterRef, Q as models_Q
 from .analytics import _area_codes_for_region, latest_release_year
 from .models import AreaDict, StdExtendH, StdUnitRelation, UnitDict, ViewStdFull
 from .services import extract_drafter_names
 from .std_type_util import normalize_std_type_code
-from .redis_circuit import safe_cache_get as _safe_cache_get, safe_cache_set as _safe_cache_set
 
 COUNT_TIER_RANK1 = 'eq1'
 COUNT_TIER_RANK_2_4 = 'range_2_4'
@@ -544,10 +544,10 @@ def _query_all_items(
     std_scope = normalize_std_scope(std_scope)
 
     cache_key = _cache_key(year, rank_filter['query'], std_scope, province, city, county)
-    all_items = _safe_cache_get(cache_key)
+    all_items = cache.get(cache_key)
     if all_items is None:
         all_items = _collect_matches(year, rank_filter, std_scope, province, city, county)
-        _safe_cache_set(cache_key, all_items, _CACHE_TTL)
+        cache.set(cache_key, all_items, _CACHE_TTL)
     return all_items, year, rank_filter, std_scope
 
 
@@ -669,7 +669,7 @@ def find_first_lead_national_standard(province=None, city=None, county=None):
     用直接 DB 查询代替全量扫描，避免超时。
     """
     ck = f'first_lead:v2:{province or ""}:{city or ""}:{county or ""}'
-    cached = _safe_cache_get(ck)
+    cached = cache.get(ck)
     if cached is not None:
         return cached if cached != '__NONE__' else None
 
@@ -718,9 +718,9 @@ def find_first_lead_national_standard(province=None, city=None, county=None):
             },
             'unit_region': _unit_region_from_relation(rel) or {},
         }
-        _safe_cache_set(ck, result, _CACHE_TTL)
+        cache.set(ck, result, _CACHE_TTL)
         return result
-    _safe_cache_set(ck, '__NONE__', _CACHE_TTL)
+    cache.set(ck, '__NONE__', _CACHE_TTL)
     return None
 
 
@@ -802,7 +802,7 @@ def find_unit_first_participation(unit_name, std_scope=None):
 
     scope_key = ','.join(normalize_std_scope(std_scope) or [])
     ck = f'unit_first_part:v1:{target}:{scope_key}'
-    cached = _safe_cache_get(ck)
+    cached = cache.get(ck)
     if cached is not None:
         return cached if cached != '__NONE__' else None
 
@@ -817,7 +817,7 @@ def find_unit_first_participation(unit_name, std_scope=None):
         result = rel_hit if rel_key <= text_key else text_hit
     else:
         result = rel_hit or text_hit
-    _safe_cache_set(ck, result if result is not None else '__NONE__', _CACHE_TTL)
+    cache.set(ck, result if result is not None else '__NONE__', _CACHE_TTL)
     return result
 
 
@@ -916,7 +916,7 @@ def find_first_participation_by_region(province=None, city=None, county=None, st
     """
     scope_key = ','.join(normalize_std_scope(std_scope) or [])
     ck = f'first_part:v2:{province or ""}:{city or ""}:{county or ""}:{scope_key}'
-    cached = _safe_cache_get(ck)
+    cached = cache.get(ck)
     if cached is not None:
         return cached
 
@@ -926,8 +926,411 @@ def find_first_participation_by_region(province=None, city=None, county=None, st
 
     std_scope_codes = normalize_std_scope(std_scope)
     items = _fetch_first_participation_by_region_sql(area_codes, std_scope_codes)
-    _safe_cache_set(ck, items, _FIRST_PART_CACHE_TTL)
+    cache.set(ck, items, _FIRST_PART_CACHE_TTL)
     return items
+
+
+FIRST_PART_EXPORT_MODES = {'detail', 'unit_summary', 'unit_first'}
+FIRST_PART_EXPORT_SCOPES = {'all', 'page_range', 'page'}
+_STD_SCOPE_LABELS = {'00': '国家标准', '01': '行业标准', '02': '地方标准', '03': '团体标准'}
+
+
+def _parse_first_participation_year(value, field_name):
+    if value is None or str(value).strip() == '':
+        return None
+    try:
+        year = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f'{field_name} 无效') from exc
+    if year < 1900 or year > 2100:
+        raise ValueError(f'{field_name} 无效')
+    return year
+
+
+def _apply_first_participation_export_filters(items, first_year_from=None, first_year_to=None, rank_filter=None):
+    result = list(items or [])
+    if first_year_from is not None:
+        result = [row for row in result if int(row.get('first_year') or 0) >= first_year_from]
+    if first_year_to is not None:
+        result = [row for row in result if int(row.get('first_year') or 0) <= first_year_to]
+    if rank_filter:
+        result = [
+            row for row in result
+            if _rank_in_filter(int(row.get('rank') or 1), rank_filter)
+        ]
+    return result
+
+
+def _transform_first_participation_export_items(items, export_mode='detail'):
+    mode = (export_mode or 'detail').strip().lower()
+    if mode not in FIRST_PART_EXPORT_MODES:
+        raise ValueError('export_mode 无效，可选：detail、unit_summary、unit_first')
+    if mode == 'detail':
+        return list(items or [])
+
+    grouped = defaultdict(list)
+    for item in items or []:
+        key = item.get('unit_id') or item.get('unit_name')
+        grouped[key].append(item)
+
+    if mode == 'unit_summary':
+        summary = []
+        for rows in grouped.values():
+            rows_sorted = sorted(
+                rows,
+                key=lambda row: (_date_sort_key(row.get('release_date')), row.get('std_id') or ''),
+            )
+            first = rows_sorted[0]
+            summary.append({
+                'unit_name': first.get('unit_name') or '',
+                'first_year': first.get('first_year'),
+                'std_count': len(rows_sorted),
+                'std_id': first.get('std_id') or '',
+                'std_chinesename': first.get('std_chinesename') or '',
+                'std_type': first.get('std_type') or '',
+                'release_date': first.get('release_date') or '',
+                'rank': first.get('rank'),
+            })
+        return sorted(
+            summary,
+            key=lambda row: (int(row.get('first_year') or 0), row.get('unit_name') or ''),
+        )
+
+    result = []
+    for rows in grouped.values():
+        rows_sorted = sorted(
+            rows,
+            key=lambda row: (_date_sort_key(row.get('release_date')), row.get('std_id') or ''),
+        )
+        result.append(rows_sorted[0])
+    return sorted(
+        result,
+        key=lambda row: (
+            int(row.get('first_year') or 0),
+            row.get('unit_name') or '',
+            _date_sort_key(row.get('release_date')),
+        ),
+    )
+
+
+def _collect_first_participation_analysis(filtered_items, export_items, meta):
+    unit_keys = set()
+    first_year_counts = defaultdict(int)
+    type_counts = defaultdict(int)
+    rank_counts = defaultdict(int)
+    for row in filtered_items or []:
+        unit_keys.add(row.get('unit_id') or row.get('unit_name'))
+        first_year = row.get('first_year')
+        if first_year is not None:
+            first_year_counts[int(first_year)] += 1
+        std_type = row.get('std_type') or '未知'
+        type_counts[std_type] += 1
+        rank_counts[int(row.get('rank') or 1)] += 1
+
+    return {
+        'meta': meta,
+        'filtered_record_total': len(filtered_items or []),
+        'filtered_unit_total': len(unit_keys),
+        'export_record_total': len(export_items or []),
+        'first_year_counts': [
+            {'first_year': year, 'count': count}
+            for year, count in sorted(first_year_counts.items())
+        ],
+        'std_type_counts': [
+            {'std_type': std_type, 'count': count}
+            for std_type, count in sorted(type_counts.items(), key=lambda item: (-item[1], item[0]))
+        ],
+        'rank_counts': [
+            {'rank': rank, 'count': count}
+            for rank, count in sorted(rank_counts.items())
+        ],
+    }
+
+
+def _prepare_first_participation_filtered(
+    province=None,
+    city=None,
+    county=None,
+    std_scope=None,
+    first_year_from=None,
+    first_year_to=None,
+    rank_query=None,
+):
+    province = (province or '').strip()
+    if not province:
+        raise ValueError('请先选择省份')
+
+    first_year_from = _parse_first_participation_year(first_year_from, 'first_year_from')
+    first_year_to = _parse_first_participation_year(first_year_to, 'first_year_to')
+    if first_year_from is not None and first_year_to is not None and first_year_from > first_year_to:
+        raise ValueError('首次参与起始年不能大于结束年')
+
+    std_scope = normalize_std_scope(std_scope)
+    rank_filter = None
+    rank_label = '不限'
+    if rank_query is not None and str(rank_query).strip():
+        rank_filter = parse_rank_filter(rank_query=rank_query)
+        rank_label = rank_filter['label']
+
+    items = find_first_participation_by_region(
+        province=province,
+        city=city,
+        county=county,
+        std_scope=std_scope,
+    )
+    filtered = _apply_first_participation_export_filters(
+        items,
+        first_year_from=first_year_from,
+        first_year_to=first_year_to,
+        rank_filter=rank_filter,
+    )
+
+    region_parts = [part for part in [province, city, county] if part]
+    scope_labels = [_STD_SCOPE_LABELS.get(code, code) for code in (std_scope or [])]
+    meta = {
+        'province': province,
+        'city': city or '',
+        'county': county or '',
+        'region_label': ' / '.join(region_parts),
+        'std_scope': std_scope,
+        'std_scope_label': '、'.join(scope_labels) if scope_labels else '全部类别',
+        'first_year_from': first_year_from,
+        'first_year_to': first_year_to,
+        'first_year_label': _format_first_year_label(first_year_from, first_year_to),
+        'rank_query': rank_label,
+    }
+    return filtered, meta
+
+
+def query_first_participation_page(
+    province=None,
+    city=None,
+    county=None,
+    std_scope=None,
+    first_year_from=None,
+    first_year_to=None,
+    rank_query=None,
+    list_mode='detail',
+    page=1,
+    size=50,
+):
+    filtered, meta = _prepare_first_participation_filtered(
+        province=province,
+        city=city,
+        county=county,
+        std_scope=std_scope,
+        first_year_from=first_year_from,
+        first_year_to=first_year_to,
+        rank_query=rank_query,
+    )
+    list_mode = (list_mode or 'detail').strip().lower()
+    if list_mode not in FIRST_PART_EXPORT_MODES:
+        raise ValueError('list_mode 无效，可选：detail、unit_summary、unit_first')
+
+    transformed = _transform_first_participation_export_items(filtered, list_mode)
+    try:
+        page = max(1, int(page))
+        size = min(200, max(1, int(size)))
+    except (TypeError, ValueError):
+        page, size = 1, 50
+    total = len(transformed)
+    start = (page - 1) * size
+    return {
+        'items': transformed[start:start + size],
+        'total': total,
+        'page': page,
+        'size': size,
+        'detail_total': len(filtered),
+        'meta': {**meta, 'list_mode': list_mode},
+    }
+
+
+def _slice_first_participation_export_items(
+    transformed,
+    export_scope='all',
+    page=1,
+    page_from=None,
+    page_to=None,
+    size=50,
+):
+    try:
+        size = min(200, max(1, int(size)))
+    except (TypeError, ValueError):
+        size = 50
+
+    total = len(transformed or [])
+    total_pages = max(1, (total + size - 1) // size) if total else 1
+    scope = (export_scope or 'all').strip().lower()
+
+    if scope == 'all':
+        return transformed, 1, total_pages, size, total_pages
+
+    if scope == 'page':
+        start_page = end_page = max(1, int(page))
+    else:
+        try:
+            start_page = max(1, int(page_from if page_from is not None else page))
+            end_page = max(1, int(page_to if page_to is not None else start_page))
+        except (TypeError, ValueError):
+            raise ValueError('导出起止页码无效')
+
+    if start_page > end_page:
+        raise ValueError('导出起始页不能大于结束页')
+    if start_page > total_pages:
+        raise ValueError(f'导出起始页超出范围，共 {total_pages} 页')
+    end_page = min(end_page, total_pages)
+
+    start = (start_page - 1) * size
+    end = end_page * size
+    return (transformed or [])[start:end], start_page, end_page, size, total_pages
+
+
+def build_first_participation_export_data(
+    province=None,
+    city=None,
+    county=None,
+    std_scope=None,
+    first_year_from=None,
+    first_year_to=None,
+    rank_query=None,
+    export_mode='detail',
+    export_scope='all',
+    page=1,
+    page_from=None,
+    page_to=None,
+    size=50,
+):
+    filtered, meta = _prepare_first_participation_filtered(
+        province=province,
+        city=city,
+        county=county,
+        std_scope=std_scope,
+        first_year_from=first_year_from,
+        first_year_to=first_year_to,
+        rank_query=rank_query,
+    )
+
+    export_mode = (export_mode or 'detail').strip().lower()
+    export_scope = (export_scope or 'all').strip().lower()
+    if export_scope not in FIRST_PART_EXPORT_SCOPES:
+        raise ValueError('export_scope 无效，可选：all、page_range')
+
+    transformed = _transform_first_participation_export_items(filtered, export_mode)
+    export_items, start_page, end_page, page_size, total_pages = _slice_first_participation_export_items(
+        transformed,
+        export_scope=export_scope,
+        page=page,
+        page_from=page_from,
+        page_to=page_to,
+        size=size,
+    )
+
+    meta = {
+        **meta,
+        'export_mode': export_mode,
+        'export_scope': export_scope,
+        'page': start_page,
+        'page_from': start_page,
+        'page_to': end_page,
+        'size': page_size,
+        'total_pages': total_pages,
+    }
+    analysis = _collect_first_participation_analysis(filtered, export_items, meta)
+    return export_items, analysis, meta
+
+
+def _format_first_year_label(first_year_from, first_year_to):
+    if first_year_from is not None and first_year_to is not None:
+        return f'{first_year_from}—{first_year_to}'
+    if first_year_from is not None:
+        return f'>={first_year_from}'
+    if first_year_to is not None:
+        return f'<={first_year_to}'
+    return '不限'
+
+
+def _first_participation_export_mode_label(export_mode):
+    return {
+        'detail': '明细（首次参与年内全部标准）',
+        'unit_summary': '单位汇总（每单位一行）',
+        'unit_first': '单位首条（每单位最早一条）',
+    }.get(export_mode, export_mode)
+
+
+def _format_export_scope_label(meta):
+    scope = (meta or {}).get('export_scope') or 'all'
+    if scope == 'all':
+        return '全部命中'
+    page_from = meta.get('page_from') or meta.get('page') or 1
+    page_to = meta.get('page_to') or page_from
+    page_size = meta.get('size') or 50
+    if page_from == page_to:
+        return f'第 {page_from} 页（每页 {page_size} 条）'
+    return f'第 {page_from}—{page_to} 页（每页 {page_size} 条）'
+
+
+def build_first_participation_excel(export_items, analysis, export_mode='detail'):
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = '明细'
+    mode = (export_mode or 'detail').strip().lower()
+    if mode == 'unit_summary':
+        ws.append(['起草单位', '首次参与年份', '首次参与年内标准数', '最早标准编号', '最早标准名称', '类型', '最早发布日期', '最早参与排位'])
+        for item in export_items:
+            ws.append([
+                item.get('unit_name') or '',
+                item.get('first_year') or '',
+                item.get('std_count') or 0,
+                item.get('std_id') or '',
+                item.get('std_chinesename') or '',
+                item.get('std_type') or '',
+                item.get('release_date') or '',
+                item.get('rank') or '',
+            ])
+    else:
+        ws.append(['起草单位', '首次参与年份', '标准编号', '标准名称', '类型', '发布日期', '参与排位'])
+        for item in export_items:
+            ws.append([
+                item.get('unit_name') or '',
+                item.get('first_year') or '',
+                item.get('std_id') or '',
+                item.get('std_chinesename') or '',
+                item.get('std_type') or '',
+                item.get('release_date') or '',
+                item.get('rank') or '',
+            ])
+
+    meta = analysis.get('meta') or {}
+    s2 = wb.create_sheet('统计')
+    s2.append(['指标', '值'])
+    s2.append(['统计范围', meta.get('region_label') or ''])
+    s2.append(['标准类别', meta.get('std_scope_label') or ''])
+    s2.append(['首次参与年份', meta.get('first_year_label') or ''])
+    s2.append(['参与排位', meta.get('rank_query') or ''])
+    s2.append(['导出粒度', _first_participation_export_mode_label(mode)])
+    s2.append(['导出范围', _format_export_scope_label(meta)])
+    s2.append(['筛选后记录数', analysis.get('filtered_record_total', 0)])
+    s2.append(['筛选后单位数（去重）', analysis.get('filtered_unit_total', 0)])
+    s2.append(['本次导出行数', analysis.get('export_record_total', 0)])
+    s2.append([])
+    s2.append(['首次参与年份', '记录数'])
+    for row in analysis.get('first_year_counts') or []:
+        s2.append([row.get('first_year'), row.get('count') or 0])
+    s2.append([])
+    s2.append(['标准类型', '记录数'])
+    for row in analysis.get('std_type_counts') or []:
+        s2.append([row.get('std_type') or '', row.get('count') or 0])
+    s2.append([])
+    s2.append(['参与排位', '记录数'])
+    for row in analysis.get('rank_counts') or []:
+        s2.append([row.get('rank'), row.get('count') or 0])
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
 
 
 def get_unit_detail(std_id, year=None):

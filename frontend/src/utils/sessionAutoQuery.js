@@ -48,7 +48,7 @@ export function markPageAutoQueryDone(page) {
 
 /** 登录后会话内，本页是否尚未用默认条件自动查询过 */
 export function shouldPageAutoQueryOnFirstVisit(page) {
-  return !isPageAutoQueryDone(page);
+  return hasSessionPendingAutoQuery() && !isPageAutoQueryDone(page);
 }
 
 export function clearSessionAutoQueryState() {

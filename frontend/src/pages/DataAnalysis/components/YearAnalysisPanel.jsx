@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Select, Table } from 'antd';
+import { Select } from 'antd';
 import AnalyticsCharts from './AnalyticsCharts';
 import EmptyState from '../../../components/ui/EmptyState';
+import GlassDataTable from '../../../components/ui/GlassDataTable';
 import { FilterPrimaryButton } from '../../../components/ui/FilterPanel';
-
-const YEAR_SELECT_CLASS = 'w-[7.5rem]';
+const YEAR_SELECT_CLASS = 'w-full min-w-[6.5rem] max-w-[7.5rem]';
 
 function YearField({ label, value, options, onChange }) {
   return (
@@ -23,11 +23,11 @@ function YearField({ label, value, options, onChange }) {
 
 function YearFilterBar({ children, action }) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="page-year-toolbar">
       <div className="flex min-w-0 flex-wrap items-end gap-x-3 gap-y-3 rounded-xl border border-slate-200/70 bg-white/80 px-3 py-3 sm:gap-x-4 sm:px-4">
         {children}
       </div>
-      <div className="flex shrink-0 justify-end sm:ml-4 sm:border-l sm:border-slate-200/80 sm:pl-4">
+      <div className="page-toolbar-end flex shrink-0 justify-end">
         {action}
       </div>
     </div>
@@ -36,7 +36,7 @@ function YearFilterBar({ children, action }) {
 
 function YearConnector({ icon = 'arrow_forward' }) {
   return (
-    <div className="hidden shrink-0 self-end pb-2 text-slate-300 sm:block">
+    <div className="page-year-connector hidden shrink-0 self-end pb-2 text-slate-300">
       <span className="material-symbols-outlined text-xl leading-none">{icon}</span>
     </div>
   );
@@ -107,7 +107,7 @@ function MetricCard({ icon, label, value, sub, tone = 'blue' }) {
 
 function FilterShell({ title, hint, children, action }) {
   return (
-    <div className="rounded-2xl border border-slate-200/70 bg-gradient-to-br from-white via-slate-50/40 to-blue-50/20 p-4 shadow-sm md:p-5">
+    <div className="page-card-pad rounded-2xl border border-slate-200/70 bg-gradient-to-br from-white via-slate-50/40 to-blue-50/20 shadow-sm">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h4 className="text-sm font-bold text-slate-800">{title}</h4>
@@ -124,11 +124,11 @@ function PanelSection({ title, subtitle, icon, children, className = '' }) {
   return (
     <section
       className={[
-        'overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_4px_20px_rgba(15,23,42,0.04)]',
+        'min-w-0 overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_4px_20px_rgba(15,23,42,0.04)]',
         className,
       ].join(' ')}
     >
-      <header className="flex items-center gap-2.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-white px-4 py-3 md:px-5">
+      <header className="page-panel-header flex items-center gap-2.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-white px-4 py-3">
         {icon ? (
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <span className="material-symbols-outlined text-lg leading-none">{icon}</span>
@@ -139,7 +139,7 @@ function PanelSection({ title, subtitle, icon, children, className = '' }) {
           {subtitle ? <p className="text-xs text-slate-500">{subtitle}</p> : null}
         </div>
       </header>
-      <div className="p-3 md:p-4">{children}</div>
+      <div className="page-card-pad-sm">{children}</div>
     </section>
   );
 }
@@ -222,7 +222,7 @@ function ComparePanel({
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="page-grid-cols-3">
             <MetricCard
               icon="calendar_today"
               label={`${compare.year_a} ${labels.yearPublish}`}
@@ -259,16 +259,18 @@ function ComparePanel({
             subtitle={`${compare.year_a} → ${compare.year_b} · 共 ${compare.items?.length ?? 0} 个类别`}
             icon="table_chart"
           >
-            <Table
-              rowKey="std_type"
-              size="small"
-              scroll={{ y: 280 }}
-              pagination={false}
+            <GlassDataTable
+              embedded
+              compact
               columns={compareColumns}
-              dataSource={compare.items || []}
-              className="year-analysis-table"
-            />
-          </PanelSection>
+              data={compare.items || []}
+              rowKey="std_type"
+              minWidth={640}
+              maxBodyHeight={280}
+              footerItemLabel="个类别"
+              emptyIcon="compare_arrows"
+              emptyTitle="暂无对比明细"
+            />          </PanelSection>
 
           <PanelSection title="可视化分析" subtitle="柱状对比与结构占比" icon="bar_chart">
             <SegmentedTabs
@@ -359,7 +361,7 @@ function RangePanel({
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="page-grid-cols-3">
             <MetricCard
               icon="inventory_2"
               label={labels.rangeTotal}
@@ -390,42 +392,47 @@ function RangePanel({
           >
             <SegmentedTabs value={dataTab} onChange={setDataTab} items={dataTabs} />
             {dataTab === 'trend' ? (
-              <Table
-                rowKey="year"
-                size="small"
-                scroll={{ x: 720, y: 260 }}
-                pagination={false}
+              <GlassDataTable
+                embedded
+                compact
                 columns={rangeTrendColumns}
-                dataSource={yearRange.by_year || []}
-                className="year-analysis-table"
+                data={yearRange.by_year || []}
+                rowKey="year"
+                minWidth={Math.max(640, 180 + (yearRange.years?.length || 8) * 88)}
+                maxBodyHeight={260}
+                footerItemLabel="个年份"
+                emptyIcon="timeline"
+                emptyTitle="暂无年度趋势数据"
               />
             ) : null}
             {dataTab === 'type' ? (
-              <Table
-                rowKey="std_type"
-                size="small"
-                scroll={{ y: 260 }}
-                pagination={false}
+              <GlassDataTable
+                embedded
+                compact
                 columns={rangeTypeColumns}
-                dataSource={yearRange.by_type || []}
-                className="year-analysis-table"
+                data={yearRange.by_type || []}
+                rowKey="std_type"
+                minWidth={560}
+                maxBodyHeight={260}
+                footerItemLabel="个类别"
+                emptyIcon="category"
+                emptyTitle="暂无类别统计数据"
               />
             ) : null}
             {dataTab === 'matrix' ? (
-              <Table
-                rowKey="std_type"
-                size="small"
-                scroll={{
-                  x: Math.max(640, (yearRange.years?.length || 0) * 96 + 220),
-                  y: 260,
-                }}
-                pagination={false}
+              <GlassDataTable
+                embedded
+                compact
                 columns={rangeDetailColumns}
-                dataSource={yearRange.items || []}
-                className="year-analysis-table"
+                data={yearRange.items || []}
+                rowKey="std_type"
+                minWidth={Math.max(640, (yearRange.years?.length || 0) * 96 + 220)}
+                maxBodyHeight={260}
+                footerItemLabel="个类别"
+                emptyIcon="grid_on"
+                emptyTitle="暂无交叉明细"
               />
-            ) : null}
-          </PanelSection>
+            ) : null}          </PanelSection>
 
           <PanelSection title="可视化分析" subtitle="趋势、堆叠与占比多角度展示" icon="monitoring">
             <SegmentedTabs value={chartView} onChange={setChartView} items={chartTabs} />

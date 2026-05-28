@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { message } from 'antd';
 import SearchFilter from './components/SearchFilter';
 import StandardTable from './components/StandardTable';
-import PageHeader from '../../components/ui/PageHeader';
 import {
   searchStandards,
   readListCache,
@@ -259,8 +258,11 @@ const StandardSearch = () => {
         setSearchParams(new URLSearchParams(lastSearch));
         return;
       }
-      
-      // 如果没有查询参数且没有历史记录，则默认自动查第一页
+      if (!shouldAutoQueryOnInitRef.current) {
+        setLoading(false);
+        return;
+      }
+      shouldAutoQueryOnInitRef.current = false;
       setSearchParams(buildSearchParams(1, DEFAULT_PAGE_SIZE, {}));
       return;
     }
@@ -337,13 +339,7 @@ const StandardSearch = () => {
   };
 
   return (
-    <div className="animate-fade-in-up">
-      <PageHeader
-        title="标准检索中心"
-        subtitle="支持标准号、名称、类型与执行状态组合检索，点击行或「查看详情」进入标准详情页"
-        badge={pagination.total > 0 && !totalPending ? `${pagination.total.toLocaleString()} 条` : undefined}
-      />
-
+    <div className="animate-fade-in-up page-content min-w-0">
       <SearchFilter
         key={filterQueryKey || 'default'}
         onSearch={applySearch}

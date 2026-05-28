@@ -30,7 +30,7 @@ const SearchFilter = ({ onSearch, onReset, loading, initialValues }) => {
   };
 
   return (
-    <div className="glass-card rounded-xl p-6">
+    <div className="glass-card page-card-pad min-w-0 rounded-xl">
       <Form
         form={form}
         layout="vertical"
@@ -45,7 +45,7 @@ const SearchFilter = ({ onSearch, onReset, loading, initialValues }) => {
           >
             <Input
               className="search-filter-control search-filter-keyword w-full bg-surface-container-low text-sm rounded-lg border-none focus:ring-1 focus:ring-primary focus:bg-surface-container-lowest transition-colors outline-none"
-              placeholder="输入标准名称或编号"
+              placeholder="标准名称或编号"
               allowClear
               prefix={
                 <span className="material-symbols-outlined text-slate-400 text-sm leading-none">search</span>
@@ -53,38 +53,40 @@ const SearchFilter = ({ onSearch, onReset, loading, initialValues }) => {
             />
           </Form.Item>
 
-          <Form.Item
-            name="std_type"
-            label={labelEl('所属类别')}
-            className={`${formItemClass} search-filter-item--2`}
-          >
-            <Select
-              placeholder="全部分类"
-              allowClear
-              className="search-filter-control w-full max-w-full custom-select-transparent"
-              popupMatchSelectWidth={280}
-              suffixIcon={<span className="material-symbols-outlined text-slate-400 text-lg">expand_more</span>}
-              options={STD_TYPE_OPTIONS}
-            />
-          </Form.Item>
+          <div className="search-filter-select-row">
+            <Form.Item
+              name="std_type"
+              label={labelEl('所属类别')}
+              className={`${formItemClass} search-filter-item--2`}
+            >
+              <Select
+                placeholder="全部分类"
+                allowClear
+                className="search-filter-control w-full max-w-full custom-select-transparent"
+                popupMatchSelectWidth={280}
+                suffixIcon={<span className="material-symbols-outlined text-slate-400 text-lg">expand_more</span>}
+                options={STD_TYPE_OPTIONS}
+              />
+            </Form.Item>
 
-          <Form.Item
-            name="status"
-            label={labelEl('执行状态')}
-            className={`${formItemClass} search-filter-item--3`}
-          >
-            <Select
-              placeholder="所有状态"
-              allowClear
-              className="search-filter-control w-full max-w-full custom-select-transparent"
-              suffixIcon={<span className="material-symbols-outlined text-slate-400 text-lg">expand_more</span>}
-              options={[
-                { value: 1, label: '现行' },
-                { value: 0, label: '废止' },
-                { value: 2, label: '即将实施' },
-              ]}
-            />
-          </Form.Item>
+            <Form.Item
+              name="status"
+              label={labelEl('执行状态')}
+              className={`${formItemClass} search-filter-item--3`}
+            >
+              <Select
+                placeholder="所有状态"
+                allowClear
+                className="search-filter-control w-full max-w-full custom-select-transparent"
+                suffixIcon={<span className="material-symbols-outlined text-slate-400 text-lg">expand_more</span>}
+                options={[
+                  { value: 1, label: '现行' },
+                  { value: 0, label: '废止' },
+                  { value: 2, label: '即将实施' },
+                ]}
+              />
+            </Form.Item>
+          </div>
 
           <div className="search-filter-actions">
             <button

@@ -14,7 +14,7 @@ const InfoField = ({ label, value, highlight, statusBadge, colSpan }) => {
   const isEmpty = text === EMPTY;
 
   return (
-    <div className={colSpan === 'full' ? 'sm:col-span-2' : ''}>
+    <div className={colSpan === 'full' ? 'page-meta-full' : ''}>
       <p className="mb-1.5 text-[11px] font-medium text-slate-500">{label}</p>
       {statusBadge ? (
         <span
@@ -69,7 +69,7 @@ export default function MetadataCard({ title, icon: Icon, fields }) {
         <h3 className="text-sm font-bold tracking-tight text-slate-800">{title}</h3>
       </header>
 
-      <div className="grid flex-1 grid-cols-1 gap-x-6 gap-y-5 p-5 sm:grid-cols-2">
+      <div className="page-meta-grid">
         {items.map((field, i) => (
           <InfoField key={`${field.label}-${i}`} {...field} />
         ))}

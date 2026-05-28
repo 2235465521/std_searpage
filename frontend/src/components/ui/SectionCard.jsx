@@ -4,7 +4,7 @@ export default function SectionCard({ title, icon: Icon, children, className = '
   return (
     <section
       className={[
-        'overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_4px_24px_rgba(15,23,42,0.05)]',
+        'min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_4px_24px_rgba(15,23,42,0.05)]',
         className,
       ].join(' ')}
     >
@@ -14,9 +14,9 @@ export default function SectionCard({ title, icon: Icon, children, className = '
             <Icon size={17} strokeWidth={2.25} />
           </span>
         ) : null}
-        <h3 className="text-sm font-bold tracking-tight text-slate-800">{title}</h3>
+        <h3 className="min-w-0 truncate text-sm font-bold tracking-tight text-slate-800">{title}</h3>
       </header>
-      <div className={['p-5 md:p-6', bodyClassName].join(' ')}>{children}</div>
+      <div className={['page-section-pad', bodyClassName].join(' ')}>{children}</div>
     </section>
   );
 }

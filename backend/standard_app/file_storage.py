@@ -152,15 +152,14 @@ def get_standard_file_path(std_id_str):
         return None
 
     root_dir = os.path.normpath(root_dir)
-    os.makedirs(root_dir, exist_ok=True)
+    if not os.path.isdir(root_dir):
+        return None
 
     prefixes = _filename_prefixes(std_id_str)
     if not prefixes:
         return None
 
     folders = _category_folders(std_id_str)
-    for folder_name in folders:
-        os.makedirs(os.path.join(root_dir, folder_name), exist_ok=True)
 
     # 1. 先找 PDF，再找 Word（有 pdf 优先下 pdf）
     for extensions in (PDF_EXTENSIONS, WORD_EXTENSIONS):

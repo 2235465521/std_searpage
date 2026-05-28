@@ -119,14 +119,14 @@ const AnalyticsCharts = ({ summary, compare, yearRange, view, embedded = false }
         title={summaryCharts.pieTitle}
         subtitle={`共 ${summaryCharts.list?.length || 0} 个区域 · 合计 ${scopeTotal.toLocaleString()} 项`}
       >
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          <div className="lg:col-span-7">
+        <div className="page-chart-row min-w-0">
+          <div className="page-chart-main min-w-0">
             <ChartPanel
               option={makePieOption({ data: summaryCharts.pie, centerTotal: scopeTotal })}
               height={h}
             />
           </div>
-          <div className="lg:col-span-5">
+          <div className="page-chart-side min-w-0">
             <ChartRankList title={`区域明细（${summaryCharts.list?.length || 0}）`}>
               <PieRankList data={summaryCharts.list} scopeTotal={scopeTotal} />
             </ChartRankList>
@@ -224,9 +224,9 @@ const AnalyticsCharts = ({ summary, compare, yearRange, view, embedded = false }
       rangeCharts.pieTitle,
       `段内合计 ${rangeTotal.toLocaleString()} 项 · 按年拆分`,
       embedded ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          <div className="lg:col-span-7">{piePanel}</div>
-          <div className="lg:col-span-5">{rankPanel}</div>
+        <div className="page-chart-row min-w-0">
+          <div className="page-chart-main min-w-0">{piePanel}</div>
+          <div className="page-chart-side min-w-0">{rankPanel}</div>
         </div>
       ) : (
         piePanel

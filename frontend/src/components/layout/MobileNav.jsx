@@ -38,7 +38,7 @@ export default function MobileNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200/80 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-4px_24px_rgba(15,23,42,0.06)] backdrop-blur-xl md:hidden"
+      className="layout-mobile-only fixed inset-x-0 bottom-0 z-50 border-t border-slate-200/80 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-4px_24px_rgba(15,23,42,0.06)] backdrop-blur-xl md:hidden"
       aria-label="移动端导航"
     >
       <div className="mx-auto flex max-w-lg items-stretch justify-around gap-0.5">
