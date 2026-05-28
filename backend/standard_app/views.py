@@ -3,10 +3,12 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .permissions import IsSuperAdmin
 from django.http import FileResponse, Http404, HttpResponse
+from django.conf import settings
 from celery.result import AsyncResult
 import os
 import mimetypes
 import urllib.parse
+import platform
 
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import CustomTokenObtainPairSerializer
@@ -155,6 +157,22 @@ class StandardDownloadView(APIView):
         content_type, _ = mimetypes.guess_type(file_path)
         content_type = content_type or 'application/octet-stream'
         filename = os.path.basename(file_path)
+        
+        if platform.system() == 'Linux':
+            base_dir = settings.SHARED_DISK_DIR
+            if not base_dir.endswith('/'):
+                base_dir += '/'
+            normalized_file_path = file_path.replace('\\', '/')
+            if normalized_file_path.startswith(base_dir):
+                relative_path = normalized_file_path[len(base_dir):]
+                nginx_path = f"/protected-files/{relative_path}"
+                response = HttpResponse(content_type=content_type)
+                response['Content-Disposition'] = (
+                    f"attachment; filename*=UTF-8''{urllib.parse.quote(filename)}"
+                )
+                response['X-Accel-Redirect'] = nginx_path.encode('utf-8')
+                return response
+
         response = FileResponse(open(file_path, 'rb'), content_type=content_type)
         response['Content-Disposition'] = (
             f"attachment; filename*=UTF-8''{urllib.parse.quote(filename)}"
