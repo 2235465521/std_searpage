@@ -169,7 +169,7 @@ if platform.system() == 'Windows':
     SHARED_DISK_DIR = os.getenv('SHARED_DISK_DIR', r'Z:\磁盘阵列\标准文件处理')
 else:
     # Linux 部署环境（见 升级部署文档.md 中约定的大文件共享挂载目录）
-    SHARED_DISK_DIR = os.getenv('SHARED_DISK_DIR', r'/mnt/std_bk/磁盘阵列/标准文件下载/')
+    SHARED_DISK_DIR = os.getenv('SHARED_DISK_DIR', r'/mnt/std_bk/磁盘阵列/标准文件处理/')
 # 标准类别 -> 子文件夹映射（可按实际目录名在下方增改）
 SHARED_DISK_TYPE_FOLDERS = {
     'GB': ['国标下载', 'word的国标', '待处理'],
